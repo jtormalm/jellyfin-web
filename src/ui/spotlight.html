@@ -388,7 +388,8 @@
 			async function fetchArtwork(item, signal) {
 				const urls = itemImageUrls(item);
 				const logoPromise = fetchImage(urls.logo, signal);
-				const preferBackdrop = localStorage.getItem('abyss-prefer-backdrop') === 'true';
+				// const preferBackdrop = localStorage.getItem('abyss-prefer-backdrop') === 'true';
+				const preferBackdrop = true;
 				let backdrop;
 				let primaryBackdrop;
 				if (preferBackdrop) {
