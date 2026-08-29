@@ -83,6 +83,10 @@ const config = {
                     from: 'assets',
                     to: 'assets'
                 },
+                {
+                    from: 'ui',
+                    to: 'ui'
+                },
                 'config.json',
                 'robots.txt',
                 {
@@ -187,6 +191,9 @@ const config = {
         rules: [
             {
                 test: /\.(html)$/,
+                exclude: [
+                    path.resolve(__dirname, 'src/ui')
+                ],
                 use: {
                     loader: 'html-loader'
                 }
