@@ -197,6 +197,8 @@ const ConnectionRequired: FunctionComponent<ConnectionRequiredProps> = ({
                     .catch(err => {
                         console.error('[ConnectionRequired] could not validate wizard status', err);
                     });
+            } else if (level === AccessLevel.Public) {
+                setIsLoading(false);
             } else if (
                 firstConnection && firstConnection.State !== ConnectionState.SignedIn && !apiClient?.isLoggedIn()
             ) {

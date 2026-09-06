@@ -29,6 +29,7 @@ import { PluginType } from '../types/plugin.ts';
 import Events from '../utils/events.ts';
 import { getParameterByName } from '../utils/url.ts';
 import datetime from '../scripts/datetime';
+import toast from '../components/toast/toast';
 
 import '../elements/emby-button/paper-icon-button-light';
 
@@ -327,6 +328,7 @@ function refreshLibraryInfoInDrawer(user) {
     html += '<div style="height:.5em;"></div>';
     html += `<a is="emby-linkbutton" class="navMenuOption lnkMediaFolder" href="#/home"><span class="material-icons navMenuOptionIcon home" aria-hidden="true"></span><span class="navMenuOptionText">${globalize.translate('Home')}</span></a>`;
     html += `<a is="emby-linkbutton" class="navMenuOption lnkMediaFolder" href="https://mer.jellyfin.nu/" target="_blank" rel="noopener noreferrer"><span class="material-icons navMenuOptionIcon search" aria-hidden="true"></span><span class="navMenuOptionText">Requests</span></a>`;
+    html += `<a is="emby-linkbutton" class="navMenuOption lnkMediaFolder btnInviteFriend" data-itemid="invitefriend" href="#"><span class="material-icons navMenuOptionIcon person_add" aria-hidden="true"></span><span class="navMenuOptionText">Invite a friend</span></a>`;
 
     // placeholder for custom menu links
     html += '<div class="customMenuOptions"></div>';
@@ -366,6 +368,11 @@ function refreshLibraryInfoInDrawer(user) {
 
     // add buttons to navigation drawer
     navDrawerScrollContainer.innerHTML = html;
+
+    const btnInviteFriend = navDrawerScrollContainer.querySelector('.btnInviteFriend');
+    if (btnInviteFriend) {
+        btnInviteFriend.addEventListener('click', onInviteFriendClick);
+    }
 
     const btnSelectServer = navDrawerScrollContainer.querySelector('.btnSelectServer');
     if (btnSelectServer) {
@@ -505,6 +512,37 @@ function onMainDrawerClick(e) {
 
 function onSelectServerClick() {
     Dashboard.selectServer();
+}
+
+function onInviteFriendClick(e) {
+    e.preventDefault();
+    const userId = Dashboard.getCurrentUserId() || getCurrentApiClient()?.getCurrentUserId();
+    const fallbackUrl = `${window.location.origin}${window.location.pathname}#/createaccount`;
+
+    if (!userId) {
+        copyInviteUrl(fallbackUrl);
+        return;
+    }
+
+    fetch(`https://utils.jellyfin.nu/api/code?userId=${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data?.code) {
+                copyInviteUrl(`${window.location.origin}${window.location.pathname}#/createaccount?code=${data.code}`);
+            } else {
+                copyInviteUrl(fallbackUrl);
+            }
+        })
+        .catch(() => {
+            copyInviteUrl(fallbackUrl);
+        });
+}
+
+function copyInviteUrl(url) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).catch(() => {});
+    }
+    toast('Invite link copied to clipboard');
 }
 
 function onSettingsClick() {

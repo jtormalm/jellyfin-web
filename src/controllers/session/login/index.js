@@ -193,7 +193,7 @@ export default function (view, params) {
             return ServerConnections.getOrCreateApiClient(serverId);
         }
 
-        return ApiClient;
+        return ServerConnections.currentApiClient();
     }
 
     function getTargetUrl() {

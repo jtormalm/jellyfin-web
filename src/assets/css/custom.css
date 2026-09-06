@@ -386,6 +386,11 @@ input[type="radio"]:checked {
     background-color: transparent;
 }
 
+.skinHeader-withBackground {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
 .skinHeader-withBackground::before {
     content: '';
     position: fixed;
@@ -394,7 +399,7 @@ input[type="radio"]:checked {
     right: 0;
     height: 8em;
     pointer-events: none;
-    background: none;
+    background: none !important;
     z-index: 1;
 }
 
