@@ -75,3 +75,17 @@ Always verify the build succeeds and outputs to `dist/`:
 npm ci
 npm run build:production
 ```
+
+---
+
+## 5. Deployment & Updating the Live Server
+
+After building `dist/`, sync the production build to the host's Jellyfin web directory and restart the container:
+
+```bash
+# 1. Sync built files to host web directory
+rsync -av --delete /home/jakob/projects/jellyfin-web/dist/ /etc/plexconfig/jellyfin/web/
+
+# 2. Restart Jellyfin container
+docker compose -f /home/jakob/core.yml restart jellyfin
+```
