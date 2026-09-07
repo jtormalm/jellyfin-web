@@ -286,8 +286,8 @@
 				const MAX_ITEMS = 7;
 
 				const [resumeResult, nextUpResult] = await Promise.allSettled([
-					fetchJson(`${base}/Users/${userId}/Items/Resume?Limit=3&Recursive=true&IncludeItemTypes=Movie,Episode&Fields=${FIELDS}`, signal),
-					fetchJson(`${base}/Shows/NextUp?Limit=5&UserId=${userId}&Fields=${FIELDS}`, signal)
+					fetchJson(`${base}/Users/${userId}/Items/Resume?Limit=3&Recursive=true&IncludeItemTypes=Movie,Episode&Fields=${FIELDS}&EnableTotalRecordCount=false`, signal),
+					fetchJson(`${base}/Shows/NextUp?Limit=5&UserId=${userId}&Fields=${FIELDS}&EnableTotalRecordCount=false`, signal)
 				]);
 				if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
 				const resumeItems = resumeResult.status === 'fulfilled' ? resumeResult.value.Items || [] : [];
@@ -301,7 +301,7 @@
 				// Tier 2: top up with recently added movies if below the target minimum.
 				if (picked.size < MIN_ITEMS) {
 					try {
-						const recentMovies = await fetchJson(`${base}/Users/${userId}/Items?Limit=${MAX_ITEMS}&Recursive=true&SortBy=DateCreated&SortOrder=Descending&IncludeItemTypes=Movie&Fields=${FIELDS}`, signal);
+						const recentMovies = await fetchJson(`${base}/Users/${userId}/Items?Limit=${MAX_ITEMS}&Recursive=true&SortBy=DateCreated&SortOrder=Descending&IncludeItemTypes=Movie&Fields=${FIELDS}&EnableTotalRecordCount=false`, signal);
 						for (const item of recentMovies.Items || []) {
 							if (picked.size >= MAX_ITEMS) break;
 							if (!picked.has(item.Id)) picked.set(item.Id, { ...item, _source: 'recent-movie' });
@@ -314,7 +314,7 @@
 				// Tier 3: still below the minimum -> top up with recently added shows.
 				if (picked.size < MIN_ITEMS) {
 					try {
-						const recentShows = await fetchJson(`${base}/Users/${userId}/Items?Limit=${MAX_ITEMS}&Recursive=true&SortBy=DateCreated&SortOrder=Descending&IncludeItemTypes=Series&Fields=${FIELDS}`, signal);
+						const recentShows = await fetchJson(`${base}/Users/${userId}/Items?Limit=${MAX_ITEMS}&Recursive=true&SortBy=DateCreated&SortOrder=Descending&IncludeItemTypes=Series&Fields=${FIELDS}&EnableTotalRecordCount=false`, signal);
 						for (const item of recentShows.Items || []) {
 							if (picked.size >= MAX_ITEMS) break;
 							if (!picked.has(item.Id)) picked.set(item.Id, { ...item, _source: 'recent-show' });
