@@ -2401,3 +2401,41 @@ button[class*="skip-intro"]:active,
 button[class*="SkipIntro"]:active {
     transform: translateY(0);
 }
+
+/* Invite a friend drawer button with subtitle */
+.btnInviteFriend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start !important;
+    text-align: left !important;
+}
+
+.btnInviteFriend.hide {
+    display: none !important;
+}
+
+.btnInviteFriend .inviteTextContainer {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 1.25;
+}
+
+.btnInviteFriend .navMenuOptionText {
+    flex-grow: 0 !important;
+    text-align: left !important;
+    margin: 0 !important;
+}
+
+.btnInviteFriend .inviteSubtitle {
+    font-size: 0.76rem;
+    font-weight: 500;
+    opacity: 0.65;
+    letter-spacing: 0.01em;
+    margin-top: 1px;
+}
+
+/* On hover, text color inherits row hover color (#121212) naturally */
+.btnInviteFriend:hover .inviteSubtitle {
+    opacity: 0.8;
+}

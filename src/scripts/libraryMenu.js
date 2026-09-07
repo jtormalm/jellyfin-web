@@ -328,7 +328,7 @@ function refreshLibraryInfoInDrawer(user) {
     html += '<div style="height:.5em;"></div>';
     html += `<a is="emby-linkbutton" class="navMenuOption lnkMediaFolder" href="#/home"><span class="material-icons navMenuOptionIcon home" aria-hidden="true"></span><span class="navMenuOptionText">${globalize.translate('Home')}</span></a>`;
     html += `<a is="emby-linkbutton" class="navMenuOption lnkMediaFolder" href="https://mer.jellyfin.nu/" target="_blank" rel="noopener noreferrer"><span class="material-icons navMenuOptionIcon search" aria-hidden="true"></span><span class="navMenuOptionText">Requests</span></a>`;
-    html += `<a is="emby-linkbutton" class="navMenuOption lnkMediaFolder btnInviteFriend" data-itemid="invitefriend" href="#"><span class="material-icons navMenuOptionIcon person_add" aria-hidden="true"></span><span class="navMenuOptionText">Invite a friend</span></a>`;
+    html += `<a is="emby-linkbutton" class="navMenuOption lnkMediaFolder btnInviteFriend hide" data-itemid="invitefriend" href="#"><span class="material-icons navMenuOptionIcon person_add" aria-hidden="true"></span><div class="inviteTextContainer"><div class="navMenuOptionText">Invite a friend</div><div class="inviteSubtitle hide"></div></div></a>`;
 
     // placeholder for custom menu links
     html += '<div class="customMenuOptions"></div>';
@@ -372,6 +372,7 @@ function refreshLibraryInfoInDrawer(user) {
     const btnInviteFriend = navDrawerScrollContainer.querySelector('.btnInviteFriend');
     if (btnInviteFriend) {
         btnInviteFriend.addEventListener('click', onInviteFriendClick);
+        updateInviteButton(btnInviteFriend);
     }
 
     const btnSelectServer = navDrawerScrollContainer.querySelector('.btnSelectServer');
@@ -514,11 +515,49 @@ function onSelectServerClick() {
     Dashboard.selectServer();
 }
 
+function updateInviteButton(buttonElem) {
+    const userId = Dashboard.getCurrentUserId() || getCurrentApiClient()?.getCurrentUserId();
+    if (!userId) {
+        buttonElem.classList.add('hide');
+        return;
+    }
+
+    fetch(`https://utils.jellyfin.nu/api/code?userId=${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            const count = data?.count ?? 0;
+            if (count > 0) {
+                buttonElem.classList.remove('hide');
+                const subtitle = buttonElem.querySelector('.inviteSubtitle');
+                if (subtitle) {
+                    const text = count === 1 ? '1 invite remaining' : `${count} invites remaining`;
+                    subtitle.textContent = text;
+                    subtitle.classList.remove('hide');
+                }
+                if (data?.code) {
+                    buttonElem.setAttribute('data-invitecode', data.code);
+                }
+            } else {
+                buttonElem.classList.add('hide');
+            }
+        })
+        .catch(() => {
+            buttonElem.classList.add('hide');
+        });
+}
+
 function onInviteFriendClick(e) {
     e.preventDefault();
-    const userId = Dashboard.getCurrentUserId() || getCurrentApiClient()?.getCurrentUserId();
+    const buttonElem = e.currentTarget;
+    const cachedCode = buttonElem.getAttribute('data-invitecode');
     const fallbackUrl = `${window.location.origin}${window.location.pathname}#/createaccount`;
 
+    if (cachedCode) {
+        copyInviteUrl(`${window.location.origin}${window.location.pathname}#/createaccount?code=${cachedCode}`);
+        return;
+    }
+
+    const userId = Dashboard.getCurrentUserId() || getCurrentApiClient()?.getCurrentUserId();
     if (!userId) {
         copyInviteUrl(fallbackUrl);
         return;
@@ -527,10 +566,10 @@ function onInviteFriendClick(e) {
     fetch(`https://utils.jellyfin.nu/api/code?userId=${userId}`)
         .then(response => response.json())
         .then(data => {
-            if (data?.code) {
+            if (data?.code && (data?.count ?? 0) > 0) {
                 copyInviteUrl(`${window.location.origin}${window.location.pathname}#/createaccount?code=${data.code}`);
             } else {
-                copyInviteUrl(fallbackUrl);
+                toast('No invites remaining');
             }
         })
         .catch(() => {
@@ -540,12 +579,16 @@ function onInviteFriendClick(e) {
 
 function copyInviteUrl(url) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).catch(() => {
-        });
+        navigator.clipboard.writeText(url)
+            .then(() => {
+                toast('Invite link copied to clipboard');
+            })
+            .catch(() => {
+                toast(url);
+            });
+    } else {
+        toast(url);
     }
-    
-    toast(url);
-    // toast('Invite link copied to clipboard');
 }
 
 function onSettingsClick() {
