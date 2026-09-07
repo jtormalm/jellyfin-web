@@ -193,7 +193,7 @@ export default function (view, params) {
             return ServerConnections.getOrCreateApiClient(serverId);
         }
 
-        return ServerConnections.currentApiClient();
+        return ServerConnections.currentApiClient() || window.ApiClient;
     }
 
     function getTargetUrl() {
@@ -271,6 +271,12 @@ export default function (view, params) {
         }
 
         const apiClient = getApiClient();
+        if (!apiClient) {
+            loading.hide();
+            view.querySelector('#txtManualName').value = '';
+            showManualForm(view, false, false);
+            return;
+        }
 
         apiClient.getQuickConnect('Enabled')
             .then(enabled => {

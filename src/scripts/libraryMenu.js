@@ -540,9 +540,12 @@ function onInviteFriendClick(e) {
 
 function copyInviteUrl(url) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).catch(() => {});
+        navigator.clipboard.writeText(url).catch(() => {
+        });
     }
-    toast('Invite link copied to clipboard');
+    
+    toast(url);
+    // toast('Invite link copied to clipboard');
 }
 
 function onSettingsClick() {
