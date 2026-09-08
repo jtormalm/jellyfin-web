@@ -52,17 +52,20 @@ class LayoutManager {
 
     getSavedLayout() {
         const saved = appSettings.get(SETTING_KEY);
-        // Validate that the saved layout is a supported layout mode
-        if (saved && Object.values(LayoutMode).includes(saved)) {
+        // Validate that the saved layout is a supported legacy layout mode
+        if (saved && LegacyLayoutModes.has(saved)) {
             return saved;
         }
     }
 
     autoLayout() {
-        // Take a guess at initial layout. The consuming app can override.
-        // NOTE: The fallback to TV mode seems like an outdated choice. TVs should be detected properly or override the
-        // default layout.
-        this.setLayout(browser.tv ? LayoutMode.Tv : this.defaultLayout || LayoutMode.Tv, false);
+        if (browser.tv) {
+            this.setLayout(LayoutMode.Tv, false);
+        } else if (browser.mobile) {
+            this.setLayout(LayoutMode.MobileLegacy, false);
+        } else {
+            this.setLayout(LayoutMode.DesktopLegacy, false);
+        }
     }
 
     init() {
