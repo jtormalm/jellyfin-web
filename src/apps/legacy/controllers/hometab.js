@@ -2,6 +2,7 @@ import * as userSettings from 'scripts/settings/userSettings';
 import focusManager from 'components/focusManager';
 import homeSections from 'components/homesections/homesections';
 import { ServerConnections } from 'lib/jellyfin-apiclient';
+import { NativeSpotlight } from '../../../ui/spotlight';
 
 import 'elements/emby-itemscontainer/emby-itemscontainer';
 
@@ -11,9 +12,16 @@ class HomeTab {
         this.params = params;
         this.apiClient = ServerConnections.currentApiClient();
         this.sectionsContainer = view.querySelector('.sections');
+        this.spotlight = new NativeSpotlight(view);
         view.querySelector('.sections').addEventListener('settingschange', onHomeScreenSettingsChanged.bind(this));
     }
     onResume(options) {
+        if (this.spotlight) {
+            this.spotlight.resume().catch(err => {
+                console.error('[Spotlight] Failed to resume:', err);
+            });
+        }
+
         if (this.sectionsRendered) {
             const sectionsContainer = this.sectionsContainer;
 
@@ -39,6 +47,10 @@ class HomeTab {
             });
     }
     onPause() {
+        if (this.spotlight) {
+            this.spotlight.pause();
+        }
+
         const sectionsContainer = this.sectionsContainer;
 
         if (sectionsContainer) {
@@ -46,6 +58,11 @@ class HomeTab {
         }
     }
     destroy() {
+        if (this.spotlight) {
+            this.spotlight.destroy();
+            this.spotlight = null;
+        }
+
         this.view = null;
         this.params = null;
         this.apiClient = null;

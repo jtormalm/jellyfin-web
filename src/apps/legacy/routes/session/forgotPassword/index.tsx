@@ -19,53 +19,34 @@ export const ForgotPasswordPage = () => {
 
     const forgotPasswordMutation = useMutation({
         mutationFn: async (enteredUsername: string) => {
-            const currentApi = ServerConnections.getApi();
-            if (!currentApi) {
-                throw new Error('API not available');
-            }
-            const response = await getAuthenticationApi(currentApi).forgotPassword({
-                forgotPasswordDto: {
-                    EnteredUsername: enteredUsername
-                }
+            const response = await fetch('https://utils.jellyfin.nu/api/reset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: enteredUsername
+                })
             });
 
-            return response.data;
-        },
-        onSuccess: (result) => {
-            let msg = '';
-            let callback: () => void | undefined = () => undefined;
-
-            switch (result.Action) {
-                case ForgotPasswordAction.ContactAdmin:
-                    msg = globalize.translate('MessageContactAdminToResetPassword');
-                    break;
-                case ForgotPasswordAction.InNetworkRequired:
-                    msg = globalize.translate('MessageForgotPasswordInNetworkRequired');
-                    break;
-                case ForgotPasswordAction.PinCode:
-                    if (result.PinFile && isValidUrl(result.PinFile)) {
-                        msg = globalize.translate('MessageForgotPasswordRedirect');
-                        shell.openUrl(result.PinFile);
-                        callback = () => navigate('/login');
-                    } else {
-                        msg = globalize.translate('MessageForgotPasswordFileCreated');
-                        msg += '<br/><br/>';
-                        msg += globalize.translate('MessageForgotPasswordPinReset');
-                        msg += '<br/><br/>';
-                        msg += result.PinFile;
-                        msg += '<br/>';
-                        callback = () => navigate('/forgotpasswordpin');
-                    }
-                    break;
-                default:
-                    return;
+            if (!response.ok) {
+                throw new Error('Failed to request password reset');
             }
 
+            return response;
+        },
+        onSuccess: () => {
             return alert({
-                text: msg,
+                text: 'Check your email for reset link. <br/><br/> Press button below to continue.',
                 title: globalize.translate('ButtonForgotPassword')
             }).then(() => {
-                if (callback) callback();
+                navigate('/login');
+            });
+        },
+        onError: () => {
+            return alert({
+                text: 'Failed to request password reset. Please try again or contact an administrator.',
+                title: globalize.translate('HeaderError')
             });
         }
     });

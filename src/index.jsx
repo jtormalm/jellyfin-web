@@ -46,6 +46,7 @@ import './styles/livetv.scss';
 import './styles/dashboard.scss';
 import './styles/detailtable.scss';
 import './styles/librarybrowser.scss';
+import './assets/css/custom.css';
 
 async function init() {
     // Log current version to console to help out with issue triage and debugging
