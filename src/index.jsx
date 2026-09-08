@@ -38,7 +38,6 @@ import './components/themeMediaPlayer';
 import './scripts/autoThemes';
 import './scripts/mouseManager';
 import './scripts/screensavermanager';
-import './ui/spotlight-loader';
 
 // Import site styles
 import './styles/site.scss';
