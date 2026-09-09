@@ -96,6 +96,18 @@
     /* Rendering controls used by the optional Lite override */
     --abyss-backdrop-blur: 23px;
     --abyss-glass-blur: 15px;
+
+    /* Jellyfin 12 MUI / SCSS theme palette variable overrides */
+    --jf-palette-primary-main: rgb(var(--abyss-accent)) !important;
+    --jf-palette-primary-dark: rgb(var(--abyss-accent)) !important;
+    --jf-palette-primary-light: rgb(var(--abyss-accent)) !important;
+    --jf-palette-primary-hover: rgba(var(--abyss-accent), 0.2) !important;
+    --jf-palette-primary-contrastText: #121212 !important;
+    --jf-palette-secondary-main: rgb(var(--abyss-accent)) !important;
+    --jf-palette-secondary-dark: rgb(var(--abyss-accent)) !important;
+    --jf-palette-secondary-light: rgb(var(--abyss-accent)) !important;
+    --jf-palette-secondary-hover: rgba(var(--abyss-accent), 0.2) !important;
+    --jf-palette-secondary-contrastText: #121212 !important;
 }
 
 /* 3. BASE / GLOBAL */
@@ -465,7 +477,7 @@ body:has(#itemDetailPage:not(.hide), #nowPlayingPage:not(.hide)) .backdropImage 
 
 .emby-tabs-slider {
     border-radius: 50px;
-    padding: 5px 2.5px;
+    padding: 3px 2px !important;
     overflow: auto;
     scrollbar-width: none;
     background-color: rgba(var(--abyss-glass-tint), 0.9);
@@ -686,19 +698,37 @@ a[data-role="button"]:hover {
 }
 
 .emby-tab-button {
-    padding: 0.5em 1.5em;
-    margin: 0 2.5px;
-    border-radius: 50px;
+    padding: 0.35em 1.25em !important;
+    margin: 0 2px !important;
+    border-radius: 50px !important;
+    height: auto !important;
+    min-height: auto !important;
+    line-height: 1.25 !important;
+    box-sizing: border-box !important;
 }
 
 .emby-tab-button-active {
-    background: rgb(var(--abyss-accent));
-    color: #121212;
-    border-radius: 50px;
+    background: rgb(var(--abyss-accent)) !important;
+    color: #121212 !important;
+    border-radius: 50px !important;
+}
+
+.emby-tab-button-active .emby-button-foreground {
+    color: #121212 !important;
 }
 
 .emby-tab-button-active:hover {
+    background: rgb(var(--abyss-accent)) !important;
     color: #121212 !important;
+}
+
+.emby-tab-button-active:hover .emby-button-foreground {
+    color: #121212 !important;
+}
+
+.emby-tab-button:hover,
+.emby-tab-button:hover .emby-button-foreground {
+    color: rgb(var(--abyss-accent)) !important;
 }
 
 .button-flat:hover {
@@ -726,13 +756,16 @@ a[data-role="button"]:hover {
 .playstatebutton-icon-played,
 .ratingbutton-icon-withrating,
 .paper-icon-button-light:hover:not(:disabled),
+.paper-icon-button-light:active:not(:disabled),
 .emby-tab-button:hover,
 .selectLabelFocused,
 .inputLabelFocused,
 .textareaLabelFocused,
 .buttonActive,
-.button-link {
-    color: rgb(var(--abyss-accent));
+.button-link,
+.button-link:hover,
+.metadataSidebarIcon {
+    color: rgb(var(--abyss-accent)) !important;
 }
 
 #itemDetailPage .button-link {
