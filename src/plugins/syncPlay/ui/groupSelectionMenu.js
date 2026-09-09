@@ -3,7 +3,6 @@ import { ServerConnections } from 'lib/jellyfin-apiclient';
 
 import SyncPlaySettingsEditor from './settings/SettingsEditor';
 import { playbackManager } from '../../../components/playback/playbackmanager';
-import loading from '../../../components/loading/loading';
 import toast from '../../../components/toast/toast';
 import actionsheet from '../../../components/actionSheet/actionSheet';
 import globalize from '../../../lib/globalize';
@@ -35,13 +34,25 @@ class GroupSelectionMenu {
 
     updateButtonVisuals(inRoom) {
         const buttons = document.querySelectorAll('.headerSyncButton');
+        const count = owpClient.getParticipantCount() || 1;
         for (const btn of buttons) {
+            let badge = btn.querySelector('.syncButton-badge');
             if (inRoom) {
                 btn.classList.add('syncButton-active');
-                btn.title = owpClient.getRoomName();
+                btn.title = globalize.translate('ButtonSyncPlay');
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'syncButton-badge';
+                    btn.appendChild(badge);
+                }
+                badge.textContent = String(count);
+                badge.style.display = 'flex';
             } else {
                 btn.classList.remove('syncButton-active');
                 btn.title = globalize.translate('ButtonSyncPlay');
+                if (badge) {
+                    badge.remove();
+                }
             }
         }
     }
@@ -50,7 +61,7 @@ class GroupSelectionMenu {
         const count = owpClient.getParticipantCount();
         try {
             const id = await actionsheet.show({
-                title: owpClient.getRoomName(),
+                title: globalize.translate('ButtonSyncPlay'),
                 text: `${count} participant${count === 1 ? '' : 's'}`,
                 dialogClass: 'syncPlayGroupMenu',
                 items: [
@@ -100,8 +111,6 @@ class GroupSelectionMenu {
             return;
         }
 
-        loading.show();
-
         try {
             const apiClient = ServerConnections.currentApiClient();
             const user = await ServerConnections.user(apiClient);
@@ -111,8 +120,14 @@ class GroupSelectionMenu {
 
             const menuItems = matchingRooms.map((room) => {
                 const count = room.count || 1;
+                const rawName = room.name || 'Watch Party';
+                const match = rawName.match(/^Room de (.+)$/);
+                const displayName = match ?
+                    globalize.translate('SyncPlayGroupDefaultTitle', match[1]) :
+                    rawName;
+
                 return {
-                    name: room.name || 'Watch Party',
+                    name: displayName,
                     icon: 'groups',
                     id: room.id,
                     selected: false,
@@ -136,7 +151,7 @@ class GroupSelectionMenu {
             }
 
             const id = await actionsheet.show({
-                title: currentItem.Name ? `Watch Party - ${currentItem.Name}` : globalize.translate('HeaderSyncPlaySelectGroup'),
+                title: globalize.translate('HeaderSyncPlaySelectGroup'),
                 items: menuItems,
                 positionTo: button,
                 border: true,
@@ -154,8 +169,6 @@ class GroupSelectionMenu {
                 console.error('WatchParty: error in group menu:', error);
                 toast({ text: globalize.translate('MessageSyncPlayNoGroupsAvailable') });
             }
-        } finally {
-            loading.hide();
         }
     }
 }
