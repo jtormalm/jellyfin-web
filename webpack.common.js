@@ -59,7 +59,7 @@ const config = {
             __JF_BUILD_VERSION__: JSON.stringify(
                 process.env.WEBPACK_SERVE ?
                     'Dev Server' :
-                    process.env.JELLYFIN_VERSION || 'Release'),
+                    `${process.env.JELLYFIN_VERSION || 'Release'} (${COMMIT_SHA})`),
             __PACKAGE_JSON_NAME__: JSON.stringify(packageJson.name),
             __PACKAGE_JSON_VERSION__: JSON.stringify(packageJson.version),
             __USE_SYSTEM_FONTS__: !!JSON.parse(process.env.USE_SYSTEM_FONTS || '0'),
