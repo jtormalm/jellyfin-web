@@ -1,13 +1,15 @@
 import { playbackManager } from '../../../components/playback/playbackmanager';
 import Events from '../../../utils/events';
 
-const DRIFT_DEADZONE_SEC = 0.04;
-const DRIFT_SOFT_MAX_SEC = 2.0;
-const PLAYBACK_RATE_MIN = 0.85;
-const PLAYBACK_RATE_MAX = 2.0;
-const DRIFT_GAIN = 0.50;
+const DRIFT_TRIGGER_SEC = 0.15;
+const DRIFT_CLEAR_SEC = 0.06;
+const DRIFT_HARD_SEEK_SEC = 3.0;
+const PLAYBACK_RATE_MIN = 0.97;
+const PLAYBACK_RATE_MAX = 1.03;
+const RATE_HOLD_MS = 1000;
 const SYNC_LOOP_MS = 500;
 const STATE_UPDATE_INTERVAL_MS = 1000;
+const HARD_SEEK_COOLDOWN_MS = 4000;
 
 class OWPPlayback {
     constructor() {
@@ -28,6 +30,9 @@ class OWPPlayback {
 
         this.lastHostSeekSentAt = 0;
         this.lastHostSentPosition = 0;
+        this.lastHardSeekTime = 0;
+        this.lastRateChangeTime = 0;
+        this.isCorrectingRate = false;
     }
 
     init(owpClient) {
@@ -192,7 +197,11 @@ class OWPPlayback {
         if (!video) return;
 
         if (!this.client.isInRoom() || this.client.isHost || this.lastSyncPlayState !== 'playing' || !this.lastSyncServerTs || this.isBuffering || video.readyState < 3 || video.paused) {
-            if (video.playbackRate !== 1) video.playbackRate = 1;
+            if (video.playbackRate !== 1) {
+                console.debug('[OWP-Sync] Resetting rate to 1.0 (idle/paused/buffering)');
+                video.playbackRate = 1;
+                this.isCorrectingRate = false;
+            }
             return;
         }
 
@@ -200,16 +209,16 @@ class OWPPlayback {
         const expected = this.lastSyncPosition + elapsed;
         const drift = expected - video.currentTime;
         const absDrift = Math.abs(drift);
+        const now = Date.now();
 
-        if (absDrift < DRIFT_DEADZONE_SEC) {
-            if (video.playbackRate !== 1) {
-                console.debug('[OWP-Sync] Drift in deadzone:', drift.toFixed(3), 's -> restoring 1.0x rate');
-                video.playbackRate = 1;
+        // 1. Hard seek if drift is severe (>= 3.0s) and not in hard-seek cooldown
+        if (absDrift >= DRIFT_HARD_SEEK_SEC) {
+            if (now - this.lastHardSeekTime < HARD_SEEK_COOLDOWN_MS) {
+                console.debug('[OWP-Sync] Severe drift but in hard-seek cooldown:', drift.toFixed(3), 's');
+                return;
             }
-            return;
-        }
-
-        if (absDrift >= DRIFT_SOFT_MAX_SEC) {
+            this.lastHardSeekTime = now;
+            this.isCorrectingRate = false;
             console.info('[OWP-Sync] Hard seek required. Drift:', drift.toFixed(3), 's. Target:', expected.toFixed(2), 'Actual:', video.currentTime.toFixed(2));
             this.startSyncing(1000);
             video.currentTime = expected;
@@ -219,10 +228,35 @@ class OWPPlayback {
             return;
         }
 
-        const correction = Math.sign(drift) * Math.sqrt(absDrift) * DRIFT_GAIN;
-        const targetRate = Math.min(Math.max(1 + correction, PLAYBACK_RATE_MIN), PLAYBACK_RATE_MAX);
-        console.debug('[OWP-Sync] Adjusting rate:', targetRate.toFixed(2), 'drift:', drift.toFixed(3), 's');
-        video.playbackRate = targetRate;
+        // 2. Hysteresis logic:
+        // Only trigger rate correction if drift crosses 0.15s (150ms).
+        // Once active, keep correcting until drift drops below 0.06s (60ms).
+        if (!this.isCorrectingRate && absDrift >= DRIFT_TRIGGER_SEC) {
+            this.isCorrectingRate = true;
+            console.info('[OWP-Sync] Drift crossed threshold (', drift.toFixed(3), 's) -> activating subtle rate correction');
+        } else if (this.isCorrectingRate && absDrift < DRIFT_CLEAR_SEC) {
+            this.isCorrectingRate = false;
+            console.info('[OWP-Sync] Drift recovered (', drift.toFixed(3), 's) -> returning to 1.0x');
+        }
+
+        // 3. Normal playback (rate = 1.0)
+        if (!this.isCorrectingRate) {
+            if (video.playbackRate !== 1 && now - this.lastRateChangeTime >= RATE_HOLD_MS) {
+                video.playbackRate = 1;
+                this.lastRateChangeTime = now;
+            }
+            return;
+        }
+
+        // 4. Subtle catch-up rate (held for at least RATE_HOLD_MS)
+        if (now - this.lastRateChangeTime >= RATE_HOLD_MS) {
+            const targetRate = drift > 0 ? PLAYBACK_RATE_MAX : PLAYBACK_RATE_MIN;
+            if (video.playbackRate !== targetRate) {
+                console.debug('[OWP-Sync] Applying held catch-up rate:', targetRate, 'drift:', drift.toFixed(3), 's');
+                video.playbackRate = targetRate;
+                this.lastRateChangeTime = now;
+            }
+        }
     }
 
     onRoomJoined(data) {
