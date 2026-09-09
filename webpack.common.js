@@ -75,7 +75,11 @@ const config = {
             chunks: [
                 'main.jellyfin',
                 'serviceworker'
-            ]
+            ],
+            minify: {
+                removeComments: false,
+                collapseWhitespace: true
+            }
         }),
         new CopyPlugin({
             patterns: [

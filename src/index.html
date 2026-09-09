@@ -86,7 +86,12 @@
     </style>
 </head>
 <body dir="ltr">
-    <!-- OpenWatchParty/ClientScript -->
+    <script>
+        // OpenWatchParty/ClientScript: Disable external plugin injection; native UI is bundled
+        window.OpenWatchParty = window.OpenWatchParty || {};
+        window.OpenWatchParty.loader = { state: 'loaded' };
+        window.OpenWatchParty.__loaded = true;
+    </script>
     <div id="reactRoot">
         <div class="splashLogo"></div>
     </div>
