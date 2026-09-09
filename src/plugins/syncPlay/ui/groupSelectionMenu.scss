@@ -2,3 +2,8 @@
     margin-left: 0.6em; /* to line up with the title */
     margin-top: 0;
 }
+
+.headerSyncButton.syncButton-active {
+    color: var(--accent-color, #00a4dc) !important;
+}
+
