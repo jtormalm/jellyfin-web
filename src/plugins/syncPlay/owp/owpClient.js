@@ -1,5 +1,3 @@
-/* eslint-disable @eslint-community/eslint-comments/disable-enable-pair */
-/* eslint-disable @typescript-eslint/naming-convention */
 import toast from '../../../components/toast/toast';
 import globalize from '../../../lib/globalize';
 
@@ -38,9 +36,7 @@ class OWPClient {
     }
 
     on(event, callback) {
-        if (!this.listeners.has(event)) {
-            this.listeners.set(event, new Set());
-        }
+        if (!this.listeners.has(event)) this.listeners.set(event, new Set());
         this.listeners.get(event).add(callback);
         return () => this.off(event, callback);
     }
@@ -54,19 +50,15 @@ class OWPClient {
     }
 
     off(event, callback) {
-        if (this.listeners.has(event)) {
-            this.listeners.get(event).delete(callback);
-        }
+        this.listeners.get(event)?.delete(callback);
     }
 
     emit(event, ...args) {
-        if (this.listeners.has(event)) {
-            for (const callback of this.listeners.get(event)) {
-                try {
-                    callback(...args);
-                } catch (err) {
-                    console.error(`[OWPClient] Error in listener for ${event}:`, err);
-                }
+        for (const callback of this.listeners.get(event) || []) {
+            try {
+                callback(...args);
+            } catch (err) {
+                console.error(`[OWPClient] Error in ${event} listener:`, err);
             }
         }
     }
@@ -95,14 +87,11 @@ class OWPClient {
         if (!apiClient) return;
         this.apiClient = apiClient;
         const accessToken = typeof apiClient.accessToken === 'function' ?
-            apiClient.accessToken() :
-            apiClient._accessToken;
-
+            apiClient.accessToken() : apiClient._accessToken;
         if (!accessToken) return;
 
         this.userId = apiClient.getCurrentUserId?.() || apiClient._currentUserId || '';
         this.userName = apiClient._currentUser?.Name || apiClient.currentUser?.()?.Name || 'User';
-
         this.connect();
     }
 
@@ -112,8 +101,7 @@ class OWPClient {
         const newUserId = apiClient.getCurrentUserId?.() || apiClient._currentUserId || '';
         const newUserName = apiClient._currentUser?.Name || apiClient.currentUser?.()?.Name || 'User';
         const accessToken = typeof apiClient.accessToken === 'function' ?
-            apiClient.accessToken() :
-            apiClient._accessToken;
+            apiClient.accessToken() : apiClient._accessToken;
 
         if (!accessToken) {
             this.disconnect();
@@ -133,9 +121,7 @@ class OWPClient {
     async fetchAuthToken() {
         if (!this.apiClient) return null;
         const accessToken = typeof this.apiClient.accessToken === 'function' ?
-            this.apiClient.accessToken() :
-            this.apiClient._accessToken;
-
+            this.apiClient.accessToken() : this.apiClient._accessToken;
         if (!accessToken) return null;
 
         const tokenUrl = typeof this.apiClient.getUrl === 'function' ?
@@ -160,8 +146,7 @@ class OWPClient {
             this.userId = data.user_id || this.userId;
             this.userName = data.user_name || this.userName;
 
-            const expiresIn = data.expires_in || 3600;
-            this.scheduleTokenRefresh(expiresIn);
+            this.scheduleTokenRefresh(data.expires_in || 3600);
 
             return {
                 token: data.token || null,
@@ -185,43 +170,40 @@ class OWPClient {
             if (auth?.token && this.ws?.readyState === WebSocket.OPEN) {
                 this.send('auth', {
                     token: auth.token,
-                    user_name: this.userName,
-                    user_id: this.userId
+                    ['user_name']: this.userName,
+                    ['user_id']: this.userId
                 });
             }
         }, refreshInMs);
     }
 
     async connect() {
-        if (this.isAuthenticated && this.ws?.readyState === WebSocket.OPEN) {
-            return true;
-        }
-        if (this.connectPromise) {
-            return this.connectPromise;
-        }
+        if (this.isAuthenticated && this.ws?.readyState === WebSocket.OPEN) return true;
+        if (this.connectPromise) return this.connectPromise;
 
-        this.connectPromise = (async () => {
+        this.connectPromise = new Promise((resolve) => {
             this.autoReconnect = true;
             if (this.reconnectTimer) {
                 clearTimeout(this.reconnectTimer);
                 this.reconnectTimer = null;
             }
 
-            const auth = await this.fetchAuthToken();
-            if (!auth?.token) {
-                console.debug('[OWPClient] No auth token available, skipping connect');
-                return false;
-            }
+            this.fetchAuthToken().then((auth) => {
+                if (!auth?.token) {
+                    this.connectPromise = null;
+                    resolve(false);
+                    return;
+                }
 
-            const wsUrl = auth.wsUrl || this.wsUrl || DEFAULT_WS_URL;
-            console.log('[OWPClient] Connecting to session server:', wsUrl);
+                const wsUrl = auth.wsUrl || this.wsUrl || DEFAULT_WS_URL;
+                console.log('[OWPClient] Connecting to watch party server:', wsUrl);
 
-            return new Promise((resolve) => {
                 try {
                     this.ws = new WebSocket(wsUrl);
                 } catch (err) {
                     console.error('[OWPClient] WebSocket init failed:', err);
                     this.scheduleReconnect();
+                    this.connectPromise = null;
                     resolve(false);
                     return;
                 }
@@ -231,30 +213,26 @@ class OWPClient {
                 const done = (success) => {
                     if (!settled) {
                         settled = true;
+                        this.connectPromise = null;
                         resolve(success);
                     }
                 };
 
                 socket.onopen = () => {
                     if (socket !== this.ws) return;
-                    console.log('[OWPClient] Connected to watch party server');
                     this.reconnectAttempts = 0;
                     this.send('auth', {
                         token: auth.token,
-                        user_name: this.userName,
-                        user_id: this.userId
+                        ['user_name']: this.userName,
+                        ['user_id']: this.userId
                     });
-                    this.send('ping', { client_ts: this.nowMs() });
+                    this.send('ping', { ['client_ts']: this.nowMs() });
                     this.startPingInterval();
                 };
 
                 this.once('auth-success', () => done(true));
 
-                socket.onerror = (err) => {
-                    if (socket !== this.ws) return;
-                    console.warn('[OWPClient] WebSocket error:', err);
-                    done(false);
-                };
+                socket.onerror = () => done(false);
 
                 socket.onclose = (event) => {
                     if (socket !== this.ws) return;
@@ -272,14 +250,15 @@ class OWPClient {
                     try {
                         this.handleMessage(JSON.parse(e.data));
                     } catch {
-                        console.error('[OWPClient] Invalid JSON received from server');
+                        // ignore invalid JSON
                     }
                 };
 
                 setTimeout(() => done(this.isAuthenticated), 5000);
+            }).catch(() => {
+                this.connectPromise = null;
+                resolve(false);
             });
-        })().finally(() => {
-            this.connectPromise = null;
         });
 
         return this.connectPromise;
@@ -311,9 +290,7 @@ class OWPClient {
         }
         this.stopPingInterval();
 
-        if (this.inRoom) {
-            this.leaveRoom();
-        }
+        if (this.inRoom) this.leaveRoom();
 
         if (this.ws) {
             const socket = this.ws;
@@ -326,7 +303,7 @@ class OWPClient {
         this.stopPingInterval();
         this.pingTimer = setInterval(() => {
             if (this.ws?.readyState === WebSocket.OPEN) {
-                this.send('ping', { client_ts: this.nowMs() });
+                this.send('ping', { ['client_ts']: this.nowMs() });
             }
         }, PING_INTERVAL_MS);
     }
@@ -359,13 +336,11 @@ class OWPClient {
         }
 
         return new Promise((resolve) => {
-            let timer = null;
             const onRoomList = (rooms) => {
-                if (timer) clearTimeout(timer);
+                clearTimeout(timer);
                 resolve(rooms);
             };
-
-            timer = setTimeout(() => {
+            const timer = setTimeout(() => {
                 this.off('room-list', onRoomList);
                 resolve(this.rooms || []);
             }, 2000);
@@ -378,13 +353,10 @@ class OWPClient {
     handleMessage(msg) {
         switch (msg.type) {
             case 'client_hello':
-                if (msg.payload?.client_id) {
-                    this.clientId = msg.payload.client_id;
-                }
+                if (msg.payload?.client_id) this.clientId = msg.payload.client_id;
                 break;
 
             case 'auth_success':
-                console.log('[OWPClient] Authentication verified');
                 this.isAuthenticated = true;
                 this.emit('auth-success');
                 this.send('list_rooms');
@@ -401,9 +373,7 @@ class OWPClient {
                 this.roomId = msg.room || '';
                 this.roomName = msg.payload?.name || 'Watch Party';
                 this.participantCount = msg.payload?.participant_count || 1;
-                if (!this.clientId && msg.client) {
-                    this.clientId = msg.client;
-                }
+                if (!this.clientId && msg.client) this.clientId = msg.client;
                 this.isHost = (msg.payload?.host_id === this.clientId);
 
                 if (typeof msg.server_ts === 'number') {
@@ -442,36 +412,26 @@ class OWPClient {
                 }
                 break;
 
-            case 'room_closed': {
-                const reason = msg.payload?.reason || 'The watch party was closed';
-                toast({ text: reason });
+            case 'room_closed':
+                toast({ text: msg.payload?.reason || 'The watch party was closed' });
                 this.resetRoomState();
                 break;
-            }
 
             case 'player_event':
-                this.emit('player-event', msg.payload, msg.server_ts || this.getServerNow());
-                break;
-
             case 'state_update':
-                this.emit('state-update', msg.payload, msg.server_ts || this.getServerNow());
+                this.emit(msg.type.replace('_', '-'), msg.payload, msg.server_ts || this.getServerNow());
                 break;
 
             case 'pong':
                 if (msg.payload?.client_ts && typeof msg.server_ts === 'number') {
-                    const now = this.nowMs();
-                    const rtt = now - msg.payload.client_ts;
+                    const rtt = this.nowMs() - msg.payload.client_ts;
                     if (rtt > 0) {
-                        const sampleOffset = msg.server_ts + (rtt / 2) - now;
+                        const sampleOffset = msg.server_ts + (rtt / 2) - this.nowMs();
                         this.serverOffsetMs = this.serverOffsetMs ?
                             (this.serverOffsetMs * 0.7 + sampleOffset * 0.3) :
                             sampleOffset;
                     }
                 }
-                break;
-
-            case 'error':
-                console.warn('[OWPClient] Server error:', msg.payload?.message || msg.payload);
                 break;
 
             default:
@@ -486,9 +446,9 @@ class OWPClient {
             return;
         }
         this.send('create_room', {
-            start_pos: typeof startPos === 'number' ? startPos : 0,
-            media_id: mediaId || null,
-            user_name: this.userName || 'User'
+            ['start_pos']: typeof startPos === 'number' ? startPos : 0,
+            ['media_id']: mediaId || null,
+            ['user_name']: this.userName || 'User'
         });
     }
 
@@ -499,7 +459,7 @@ class OWPClient {
             this.connect();
             return;
         }
-        this.send('join_room', { user_name: this.userName || 'User' }, roomId);
+        this.send('join_room', { ['user_name']: this.userName || 'User' }, roomId);
     }
 
     leaveRoom() {
@@ -523,12 +483,12 @@ class OWPClient {
 
     sendPlayerEvent(action, position, playState) {
         if (!this.isHost || !this.inRoom) return;
-        this.send('player_event', { action, position, play_state: playState });
+        this.send('player_event', { action, position, ['play_state']: playState });
     }
 
     sendStateUpdate(position, playState) {
         if (!this.isHost || !this.inRoom) return;
-        this.send('state_update', { position, play_state: playState });
+        this.send('state_update', { position, ['play_state']: playState });
     }
 }
 
