@@ -202,11 +202,15 @@ class OWPPlayback {
         const absDrift = Math.abs(drift);
 
         if (absDrift < DRIFT_DEADZONE_SEC) {
-            if (video.playbackRate !== 1) video.playbackRate = 1;
+            if (video.playbackRate !== 1) {
+                console.debug('[OWP-Sync] Drift in deadzone:', drift.toFixed(3), 's -> restoring 1.0x rate');
+                video.playbackRate = 1;
+            }
             return;
         }
 
         if (absDrift >= DRIFT_SOFT_MAX_SEC) {
+            console.info('[OWP-Sync] Hard seek required. Drift:', drift.toFixed(3), 's. Target:', expected.toFixed(2), 'Actual:', video.currentTime.toFixed(2));
             this.startSyncing(1000);
             video.currentTime = expected;
             this.lastSyncPosition = expected;
@@ -216,7 +220,9 @@ class OWPPlayback {
         }
 
         const correction = Math.sign(drift) * Math.sqrt(absDrift) * DRIFT_GAIN;
-        video.playbackRate = Math.min(Math.max(1 + correction, PLAYBACK_RATE_MIN), PLAYBACK_RATE_MAX);
+        const targetRate = Math.min(Math.max(1 + correction, PLAYBACK_RATE_MIN), PLAYBACK_RATE_MAX);
+        console.debug('[OWP-Sync] Adjusting rate:', targetRate.toFixed(2), 'drift:', drift.toFixed(3), 's');
+        video.playbackRate = targetRate;
     }
 
     onRoomJoined(data) {
@@ -255,6 +261,7 @@ class OWPPlayback {
         const video = this.video || this.getVideo();
         if (!video) return;
 
+        console.info('[OWP-Sync] Received host player_event:', payload.action, 'pos:', payload.position, 'play_state:', payload.play_state);
         this.startSyncing(2000);
         const position = typeof payload.position === 'number' ? payload.position : video.currentTime;
 
@@ -263,6 +270,7 @@ class OWPPlayback {
                 const elapsed = Math.max(0, this.client.getServerNow() - serverTs) / 1000;
                 const target = position + elapsed;
                 if (Math.abs(video.currentTime - target) > 1.0) {
+                    console.info('[OWP-Sync] Aligning position on play:', video.currentTime.toFixed(2), '->', target.toFixed(2));
                     video.currentTime = target;
                 }
                 this.lastSyncPosition = target;
@@ -273,13 +281,14 @@ class OWPPlayback {
                 const delay = Math.max(0, targetTs - this.client.getServerNow());
                 setTimeout(() => {
                     video.play().catch((err) => {
-                        console.warn('[OWPPlayback] Autoplay blocked, click play to resume:', err);
+                        console.warn('[OWP-Sync] Autoplay blocked, click play to resume:', err);
                     });
                 }, delay);
                 break;
             }
 
             case 'pause': {
+                console.info('[OWP-Sync] Pausing playback at:', position.toFixed(2));
                 video.currentTime = position;
                 this.lastSyncPosition = position;
                 this.lastSyncServerTs = this.client.getServerNow();
@@ -290,13 +299,14 @@ class OWPPlayback {
             }
 
             case 'seek': {
+                console.info('[OWP-Sync] Seeking to:', position.toFixed(2));
                 video.currentTime = position;
                 this.lastSyncPosition = position;
                 this.lastSyncServerTs = this.client.getServerNow();
                 const hostPlaying = payload.play_state === 'playing';
                 this.lastSyncPlayState = hostPlaying ? 'playing' : 'paused';
                 if (hostPlaying) {
-                    video.play().catch((err) => console.debug('[OWPPlayback] play prevented:', err));
+                    video.play().catch((err) => console.debug('[OWP-Sync] play prevented:', err));
                 } else {
                     video.pause();
                     this.normalizePlaybackRate();
@@ -305,6 +315,7 @@ class OWPPlayback {
             }
 
             case 'buffering': {
+                console.info('[OWP-Sync] Host buffering at:', position.toFixed(2));
                 video.currentTime = position;
                 this.lastSyncPosition = position;
                 this.lastSyncPlayState = 'paused';
@@ -331,8 +342,10 @@ class OWPPlayback {
         if (payload.play_state) {
             this.lastSyncPlayState = payload.play_state;
             if (payload.play_state === 'playing' && video.paused && !this.isSyncing && !this.isBuffering) {
-                video.play().catch((err) => console.debug('[OWPPlayback] play prevented:', err));
+                console.info('[OWP-Sync] Resuming playback from state update');
+                video.play().catch((err) => console.debug('[OWP-Sync] play prevented:', err));
             } else if (payload.play_state === 'paused' && !video.paused && !this.isSyncing) {
+                console.info('[OWP-Sync] Pausing playback from state update');
                 video.pause();
                 this.normalizePlaybackRate();
             }
