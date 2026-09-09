@@ -371,7 +371,11 @@ class OWPClient {
                 const wasInRoom = this.inRoom;
                 this.inRoom = true;
                 this.roomId = msg.room || '';
-                this.roomName = msg.payload?.name || 'Watch Party';
+                const rawName = msg.payload?.name || 'Watch Party';
+                const match = rawName.match(/^Room de (.+)$/);
+                this.roomName = match ?
+                    globalize.translate('SyncPlayGroupDefaultTitle', match[1]) :
+                    rawName;
                 this.participantCount = msg.payload?.participant_count || 1;
                 if (!this.clientId && msg.client) this.clientId = msg.client;
                 this.isHost = (msg.payload?.host_id === this.clientId);

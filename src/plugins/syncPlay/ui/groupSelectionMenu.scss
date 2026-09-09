@@ -3,7 +3,30 @@
     margin-top: 0;
 }
 
-.headerSyncButton.syncButton-active {
-    color: var(--accent-color, #00a4dc) !important;
-}
+.headerSyncButton {
+    position: relative;
 
+    &.syncButton-active {
+        opacity: 1;
+    }
+
+    .syncButton-badge {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        min-width: 15px;
+        height: 15px;
+        padding: 0 3px;
+        border-radius: 8px;
+        background-color: rgba(255, 255, 255, 0.25);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 15px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        box-sizing: border-box;
+    }
+}
