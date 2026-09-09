@@ -71,6 +71,16 @@ class OWPPlayback {
         }
     }
 
+    broadcastHost(action) {
+        if (!this.client.isHost || this.isSyncing) return;
+        const video = this.video || this.getVideo();
+        if (!video) return;
+
+        const playState = video.paused ? 'paused' : 'playing';
+        this.client.sendPlayerEvent(action, video.currentTime, playState);
+        this.client.sendStateUpdate(video.currentTime, playState);
+    }
+
     bindCurrentVideo() {
         const video = this.getVideo();
         if (!video) return;
@@ -79,17 +89,11 @@ class OWPPlayback {
         this.unbindVideo();
         this.video = video;
 
-        const onPlay = () => {
-            if (this.client.isHost && !this.isSyncing) {
-                this.client.sendPlayerEvent('play', video.currentTime, 'playing');
-                this.client.sendStateUpdate(video.currentTime, 'playing');
-            }
-        };
+        const onPlay = () => this.broadcastHost('play');
 
         const onPause = () => {
-            if (this.client.isHost && !this.isSyncing && !this.isBuffering && !video.seeking) {
-                this.client.sendPlayerEvent('pause', video.currentTime, 'paused');
-                this.client.sendStateUpdate(video.currentTime, 'paused');
+            if (!this.isBuffering && !video.seeking) {
+                this.broadcastHost('pause');
             }
         };
 
@@ -100,10 +104,7 @@ class OWPPlayback {
                 if (Math.abs(video.currentTime - this.lastHostSentPosition) < 0.5) return;
                 this.lastHostSeekSentAt = now;
                 this.lastHostSentPosition = video.currentTime;
-
-                const playState = video.paused ? 'paused' : 'playing';
-                this.client.sendPlayerEvent('seek', video.currentTime, playState);
-                this.client.sendStateUpdate(video.currentTime, playState);
+                this.broadcastHost('seek');
             }
         };
 
