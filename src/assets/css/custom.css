@@ -2115,6 +2115,28 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     }
 }
 
+/* Detail page poster gutter is vw-based, so it keeps growing on large
+   desktop monitors even though the poster itself doesn't extend anywhere
+   near that far down the page — leaving Cast & Crew, Guest Stars and More
+   from Season rows indented far past where the poster actually is. Cap the
+   gutter/poster at sane pixel maximums instead of letting them grow forever. */
+[dir="ltr"] .detailRibbon,
+[dir="ltr"] .detailPagePrimaryContent,
+[dir="ltr"] .detailPageContent {
+    padding-left: min(32.45vw, 380px) !important;
+}
+
+[dir="rtl"] .detailRibbon,
+[dir="rtl"] .detailPagePrimaryContent,
+[dir="rtl"] .detailPageContent {
+    padding-right: min(32.45vw, 380px) !important;
+}
+
+.layout-desktop .detailImageContainer .card,
+.layout-tv .detailImageContainer .card {
+    width: min(25vw, 300px) !important;
+}
+
 /* Backdrop filter support */
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
 
