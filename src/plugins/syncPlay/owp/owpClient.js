@@ -1,6 +1,21 @@
 import toast from '../../../components/toast/toast';
 import globalize from '../../../lib/globalize';
 
+function buildAuthorizationHeader(apiClient, accessToken) {
+    const client = typeof apiClient.appName === 'function' ? apiClient.appName() : 'Jellyfin Web';
+    const version = typeof apiClient.appVersion === 'function' ? apiClient.appVersion() : '';
+    const deviceId = typeof apiClient.deviceId === 'function' ? apiClient.deviceId() : '';
+    const device = typeof apiClient.deviceName === 'function' ? apiClient.deviceName() : '';
+
+    return [
+        `MediaBrowser Client="${encodeURIComponent(client)}"`,
+        `Device="${encodeURIComponent(device)}"`,
+        `DeviceId="${encodeURIComponent(deviceId)}"`,
+        `Version="${encodeURIComponent(version)}"`,
+        `Token="${encodeURIComponent(accessToken)}"`
+    ].join(', ');
+}
+
 const DEFAULT_WS_URL = 'wss://party.jellyfin.nu/ws';
 const PING_INTERVAL_MS = 10000;
 const RECONNECT_BASE_MS = 1000;
@@ -130,7 +145,7 @@ class OWPClient {
 
         try {
             const response = await fetch(tokenUrl, {
-                headers: { 'X-Emby-Token': accessToken }
+                headers: { 'Authorization': buildAuthorizationHeader(this.apiClient, accessToken) }
             });
             if (!response.ok) return null;
 
