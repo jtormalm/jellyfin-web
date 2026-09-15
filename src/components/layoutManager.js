@@ -52,8 +52,8 @@ class LayoutManager {
 
     getSavedLayout() {
         const saved = appSettings.get(SETTING_KEY);
-        // Validate that the saved layout is a supported layout mode
-        if (saved && Object.values(LayoutMode).includes(saved)) {
+        // Validate that the saved layout is a supported legacy layout mode
+        if (saved && LegacyLayoutModes.has(saved)) {
             return saved;
         }
     }
