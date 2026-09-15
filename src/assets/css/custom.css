@@ -77,11 +77,11 @@
     /* Primary accent colour — used for highlights, active states, progress bars.
        Format: R, G, B (no rgb() wrapper) so opacity variants work cleanly. */
     --abyss-accent: 245, 245, 247;
+    /* Space-separated twin used by Jellyfin 12's MUI channel variables. */
+    --abyss-accent-channel: 245 245 247;
 
     /* Corner rounding applied globally */
     --abyss-radius: 12px;
-
-    /* Fixed defaults */
 
     /* Indicator pill background (episode count, etc.) */
     --abyss-indicator: 55, 55, 55;
@@ -96,18 +96,29 @@
     /* Rendering controls used by the optional Lite override */
     --abyss-backdrop-blur: 23px;
     --abyss-glass-blur: 15px;
+}
 
-    /* Jellyfin 12 MUI / SCSS theme palette variable overrides */
-    --jf-palette-primary-main: rgb(var(--abyss-accent)) !important;
-    --jf-palette-primary-dark: rgb(var(--abyss-accent)) !important;
-    --jf-palette-primary-light: rgb(var(--abyss-accent)) !important;
-    --jf-palette-primary-hover: rgba(var(--abyss-accent), 0.2) !important;
-    --jf-palette-primary-contrastText: #121212 !important;
-    --jf-palette-secondary-main: rgb(var(--abyss-accent)) !important;
-    --jf-palette-secondary-dark: rgb(var(--abyss-accent)) !important;
-    --jf-palette-secondary-light: rgb(var(--abyss-accent)) !important;
-    --jf-palette-secondary-hover: rgba(var(--abyss-accent), 0.2) !important;
-    --jf-palette-secondary-contrastText: #121212 !important;
+/* Jellyfin 12 exposes the built-in theme palette as CSS variables. Scope our
+   overrides to the dark theme instead of forcing them everywhere with
+   !important on :root — that blanket approach was bleeding accent-white
+   into places like count/played indicators and hover states that have
+   their own more specific rules (see custom.css indicator + tab-hover fixes). */
+html[data-theme="dark"] {
+    --jf-palette-primary-main: rgb(var(--abyss-accent));
+    --jf-palette-primary-mainChannel: var(--abyss-accent-channel);
+    --jf-palette-primary-contrastText: #121212;
+    --jf-palette-primary-dark: rgb(var(--abyss-accent));
+    --jf-palette-primary-light: rgb(var(--abyss-accent));
+    --jf-palette-primary-hover: rgba(var(--abyss-accent), 0.2);
+    --jf-palette-secondary-main: rgb(var(--abyss-accent));
+    --jf-palette-secondary-mainChannel: var(--abyss-accent-channel);
+    --jf-palette-secondary-contrastText: #121212;
+    --jf-palette-secondary-dark: rgb(var(--abyss-accent));
+    --jf-palette-secondary-light: rgb(var(--abyss-accent));
+    --jf-palette-secondary-hover: rgba(var(--abyss-accent), 0.2);
+    --jf-palette-AppBar-defaultBg: rgba(var(--abyss-glass-tint), 0.92);
+    --jf-palette-AppBar-transparentBg: rgba(var(--abyss-glass-tint), 0.72);
+    --jf-card-borderRadius: var(--abyss-radius);
 }
 
 /* 3. BASE / GLOBAL */
@@ -717,12 +728,12 @@ a[data-role="button"]:hover {
     color: #121212 !important;
 }
 
-.emby-tab-button-active:hover {
+.emby-tab-button.emby-tab-button-active:hover {
     background: rgb(var(--abyss-accent)) !important;
     color: #121212 !important;
 }
 
-.emby-tab-button-active:hover .emby-button-foreground {
+.emby-tab-button.emby-tab-button-active:hover .emby-button-foreground {
     color: #121212 !important;
 }
 
@@ -919,7 +930,8 @@ div[data-role="controlgroup"] a[data-role="button"] {
 }
 
 .countIndicator {
-    background: rgba(var(--abyss-indicator), 0.8);
+    background: rgba(var(--abyss-indicator), 0.8) !important;
+    color: #fff !important;
     box-shadow: none;
     border-radius: 10px !important;
     padding: 4px;
@@ -927,7 +939,8 @@ div[data-role="controlgroup"] a[data-role="button"] {
 }
 
 .playedIndicator {
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.4) !important;
+    color: #fff !important;
     box-shadow: none;
     border-radius: 10px !important;
     padding: 4px;
