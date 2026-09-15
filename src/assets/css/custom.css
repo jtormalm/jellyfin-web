@@ -83,8 +83,7 @@
     /* Corner rounding applied globally */
     --abyss-radius: 12px;
 
-    /* Indicator pill background (episode count, etc.) */
-    --abyss-indicator: 55, 55, 55;
+    /* Fixed defaults */
 
     /* Backgorund for drawers and dialogs */
     --abyss-glass-tint: 42, 42, 42;
@@ -98,28 +97,21 @@
     --abyss-glass-blur: 15px;
 }
 
-/* Jellyfin 12 exposes the built-in theme palette as CSS variables. Scope our
-   overrides to the dark theme instead of forcing them everywhere with
-   !important on :root — that blanket approach was bleeding accent-white
-   into places like count/played indicators and hover states that have
-   their own more specific rules (see custom.css indicator + tab-hover fixes). */
+/* Jellyfin 12 exposes the built-in theme palette as CSS variables. Keep the
+   MUI and legacy surfaces on the same Abyss palette without relying on
+   generated Emotion class names. */
 html[data-theme="dark"] {
     --jf-palette-primary-main: rgb(var(--abyss-accent));
     --jf-palette-primary-mainChannel: var(--abyss-accent-channel);
     --jf-palette-primary-contrastText: #121212;
-    --jf-palette-primary-dark: rgb(var(--abyss-accent));
-    --jf-palette-primary-light: rgb(var(--abyss-accent));
-    --jf-palette-primary-hover: rgba(var(--abyss-accent), 0.2);
     --jf-palette-secondary-main: rgb(var(--abyss-accent));
     --jf-palette-secondary-mainChannel: var(--abyss-accent-channel);
     --jf-palette-secondary-contrastText: #121212;
-    --jf-palette-secondary-dark: rgb(var(--abyss-accent));
-    --jf-palette-secondary-light: rgb(var(--abyss-accent));
-    --jf-palette-secondary-hover: rgba(var(--abyss-accent), 0.2);
     --jf-palette-AppBar-defaultBg: rgba(var(--abyss-glass-tint), 0.92);
     --jf-palette-AppBar-transparentBg: rgba(var(--abyss-glass-tint), 0.72);
     --jf-card-borderRadius: var(--abyss-radius);
 }
+
 
 /* 3. BASE / GLOBAL */
 
@@ -292,6 +284,7 @@ input[type="radio"]:checked {
     display: none !important;
 }
 
+
 #tvRecommendedPage .pageTitle,
 #moviesPage .pageTitle,
 #musicRecommendedPage .pageTitle,
@@ -390,6 +383,7 @@ input[type="radio"]:checked {
     margin-bottom: 12px;
 }
 
+
 /* 5. LAYOUT & STRUCTURE */
 
 /* Header */
@@ -409,11 +403,6 @@ input[type="radio"]:checked {
     background-color: transparent;
 }
 
-.skinHeader-withBackground {
-    background: transparent !important;
-    background-color: transparent !important;
-}
-
 .skinHeader-withBackground::before {
     content: '';
     position: fixed;
@@ -422,7 +411,7 @@ input[type="radio"]:checked {
     right: 0;
     height: 8em;
     pointer-events: none;
-    background: none !important;
+    background: none;
     z-index: 1;
 }
 
@@ -436,15 +425,164 @@ input[type="radio"]:checked {
     border-radius: 50px !important;
 }
 
+/* Jellyfin 12 modern app shell (React / MUI) [BETA] */
+
+/*
+.mainAnimatedPage, 
+.skinBody {
+   margin-top: 6%;
+}
+*/
+
+html[data-theme="dark"] .MuiAppBar-root {
+    color: rgb(var(--abyss-accent));
+    background-color: rgba(var(--abyss-glass-tint), 0.72) !important;
+    background-image: none !important;
+    border: none;
+    border-bottom: 1px solid rgba(var(--abyss-accent), 0.16);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.18);
+    -webkit-backdrop-filter: blur(var(--abyss-glass-blur));
+    backdrop-filter: blur(var(--abyss-glass-blur));
+}
+
+/*
+html[data-theme="dark"] .MuiAppBar-root.MuiAppBar-positionFixed {
+    top: 24px !important;
+    left: 24px !important;
+    right: 24px !important;
+    width: auto !important;
+    border-radius: var(--abyss-radius) !important;
+    border: none;
+    border-bottom: 1px solid rgba(var(--abyss-accent), 0.16);
+}
+*/
+
+html[data-theme="dark"] .MuiToolbar-root.MuiToolbar-gutters.MuiToolbar-dense.padded-left {
+    padding-left: 1.8% !important;
+}
+
+html[data-theme="dark"] .MuiToolbar-root.MuiToolbar-gutters.MuiToolbar-dense.padded-right {
+    padding-right: 1.8% !important;
+}
+
+html[data-theme="dark"] .MuiToolbar-root {
+    min-height: 64px;
+    gap: 0.25rem;
+    font-family: "Google Sans", sans-serif;
+}
+
+html[data-theme="dark"] .MuiButtonGroup-root {
+    gap: 0.25rem;
+}
+
+html[data-theme="dark"] .MuiToolbar-root .MuiButton-root,
+html[data-theme="dark"] .MuiToolbar-root .MuiIconButton-root {
+    color: rgba(var(--abyss-accent), 0.78);
+    border-radius: var(--abyss-radius);
+    transition: background-color 0.25s var(--abyss-ease),
+        color 0.25s var(--abyss-ease),
+        transform 0.25s var(--abyss-ease);
+}
+
+html[data-theme="dark"] .MuiToolbar-root .MuiButton-root {
+    min-width: auto;
+    padding: 0.5rem 0.85rem;
+    font-family: inherit;
+    font-weight: 600;
+    line-height: 1.25;
+    text-transform: none;
+}
+
+html[data-theme="dark"] .MuiToolbar-root .MuiIconButton-root {
+    padding: 0.6rem;
+}
+
+html[data-theme="dark"] .MuiToolbar-root .MuiButton-root:hover,
+html[data-theme="dark"] .MuiToolbar-root .MuiIconButton-root:hover {
+    color: rgb(var(--abyss-accent));
+    background-color: rgba(var(--abyss-accent), 0.12);
+}
+
+html[data-theme="dark"] .MuiToolbar-root .MuiButton-root.MuiButton-colorPrimary {
+    color: #121212;
+    background-color: rgb(var(--abyss-accent));
+}
+
+html[data-theme="dark"] .MuiToolbar-root .MuiButton-root.MuiButton-colorPrimary:hover {
+    color: #121212;
+    background-color: rgba(var(--abyss-accent), 0.88);
+}
+
+html[data-theme="dark"] .MuiDrawer-paper,
+html[data-theme="dark"] .MuiMenu-paper,
+html[data-theme="dark"] .MuiDialog-paper {
+    color: rgb(var(--abyss-accent));
+    background-color: rgba(var(--abyss-glass-tint), 0.92);
+    background-image: none;
+    border: 1px solid rgba(var(--abyss-accent), 0.16);
+    box-shadow: 0 8px 36px rgba(0, 0, 0, 0.32);
+    -webkit-backdrop-filter: blur(var(--abyss-glass-blur));
+    backdrop-filter: blur(var(--abyss-glass-blur));
+}
+
+html[data-theme="dark"] .MuiDrawer-paper {
+    border-radius: 0 var(--abyss-radius) var(--abyss-radius) 0;
+}
+
+html[data-theme="dark"] .MuiMenu-paper,
+html[data-theme="dark"] .MuiDialog-paper {
+    border-radius: var(--abyss-radius);
+}
+
+html[data-theme="dark"] .MuiListItemButton-root {
+    margin: 2px 8px;
+    border-radius: var(--abyss-radius);
+    transition: background-color 0.25s var(--abyss-ease),
+        color 0.25s var(--abyss-ease);
+}
+
+html[data-theme="dark"] .MuiListItemButton-root:hover {
+    color: #121212;
+    background-color: rgba(var(--abyss-accent), 0.82);
+}
+
+html[data-theme="dark"] .MuiListItemButton-root.Mui-selected,
+html[data-theme="dark"] .MuiListItemButton-root.Mui-selected:hover {
+    color: #121212;
+    background-color: rgb(var(--abyss-accent));
+}
+
+html[data-theme="dark"] .MuiFilledInput-root,
+html[data-theme="dark"] .MuiOutlinedInput-root {
+    border-radius: var(--abyss-radius);
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Let the Modern app bar float over Spotlight instead of reserving an opaque
+   strip above it. The loader owns this state so other routes keep their
+   normal app-bar spacing. */
+html.abyss-spotlight-visible[data-theme="dark"] .MuiAppBar-root.MuiAppBar-colorTransparent:has(+div[aria-hidden="true"]) {
+    background-color: transparent !important;
+    background-image: none !important;
+    border-bottom-color: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+html.abyss-spotlight-visible[data-theme="dark"] .MuiAppBar-root+div[aria-hidden="true"] {
+    height: 0 !important;
+}
+
 /* Main content */
-.withSectionTabs .backdropImage {
+.backdropImage {
     -webkit-filter: blur(var(--abyss-backdrop-blur)) saturate(120%) contrast(120%) brightness(25%);
     filter: blur(var(--abyss-backdrop-blur)) saturate(120%) contrast(120%) brightness(25%);
 }
 
-body:has(#itemDetailPage:not(.hide), #nowPlayingPage:not(.hide)) .backdropImage {
-    -webkit-filter: blur(var(--abyss-backdrop-blur)) saturate(120%) contrast(120%) brightness(25%);
-    filter: blur(var(--abyss-backdrop-blur)) saturate(120%) contrast(120%) brightness(25%);
+.hideMainDrawer .backdropImage {
+    -webkit-filter: none;
+    filter: none;
 }
 
 .backdropContainer {
@@ -456,6 +594,8 @@ body:has(#itemDetailPage:not(.hide), #nowPlayingPage:not(.hide)) .backdropImage 
 .backgroundContainer.withBackdrop {
     background-color: rgba(0, 0, 0, 0);
 }
+
+
 
 /* Navigation / drawer */
 .editPageSidebar,
@@ -488,7 +628,7 @@ body:has(#itemDetailPage:not(.hide), #nowPlayingPage:not(.hide)) .backdropImage 
 
 .emby-tabs-slider {
     border-radius: 50px;
-    padding: 3px 2px !important;
+    padding: 5px 2.5px;
     overflow: auto;
     scrollbar-width: none;
     background-color: rgba(var(--abyss-glass-tint), 0.9);
@@ -542,11 +682,13 @@ body:has(#itemDetailPage:not(.hide), #nowPlayingPage:not(.hide)) .backdropImage 
 }
 
 /* Backdrop / detail ribbon */
-.itemBackdrop {
-    height: 31vh !important;
+.layout-tv .itemBackdrop,
+.layout-desktop .itemBackdrop {
+    height: 20vh !important;
     display: inherit;
 }
 
+.layout-tv .detailRibbon,
 .layout-desktop .detailRibbon {
     background: rgba(0, 0, 0, .2) !important;
     margin-top: 0;
@@ -558,11 +700,6 @@ body:has(#itemDetailPage:not(.hide), #nowPlayingPage:not(.hide)) .backdropImage 
     background: rgba(0, 0, 0, .5) !important;
 }
 
-/* Detail logo */
-.detailLogo {
-    display: none;
-}
-
 #itemDetailPage .detailLogo {
     position: static;
     margin-left: 32.5%;
@@ -571,7 +708,6 @@ body:has(#itemDetailPage:not(.hide), #nowPlayingPage:not(.hide)) .backdropImage 
     -webkit-filter: drop-shadow(0 0 10px rgba(2, 2, 2, 0.75));
     flex-shrink: 0;
     background-position: 0 50%;
-    margin-top: -18vh;
     margin-bottom: 2vh;
 }
 
@@ -620,6 +756,8 @@ body:has(#itemDetailPage:not(.hide), #nowPlayingPage:not(.hide)) .backdropImage 
     margin-top: 7.5rem !important;
 }
 
+
+
 /* Disable theme selectors - managed by Abyss */
 
 .selectContainer:has(#selectTheme),
@@ -643,6 +781,24 @@ body:has(#itemDetailPage:not(.hide), #nowPlayingPage:not(.hide)) .backdropImage 
 .selectContainer:has(#selectDashboardTheme option[value="dark"]:checked) #selectDashboardTheme+.selectArrow {
     opacity: 0.4 !important;
 }
+
+html[data-theme="dark"] #displayPreferencesPage .MuiFormControl-root:has(input[name="theme"]),
+html[data-theme="dark"] #displayPreferencesPage .MuiFormControl-root:has(input[name="dashboardTheme"]) {
+    cursor: not-allowed !important;
+}
+
+html[data-theme="dark"] #displayPreferencesPage .MuiFormControl-root:has(input[name="theme"]) .MuiInputLabel-root,
+html[data-theme="dark"] #displayPreferencesPage .MuiFormControl-root:has(input[name="theme"]) .MuiInputBase-root,
+html[data-theme="dark"] #displayPreferencesPage .MuiFormControl-root:has(input[name="dashboardTheme"]) .MuiInputLabel-root,
+html[data-theme="dark"] #displayPreferencesPage .MuiFormControl-root:has(input[name="dashboardTheme"]) .MuiInputBase-root {
+    opacity: 0.4 !important;
+}
+
+html[data-theme="dark"] #displayPreferencesPage .MuiFormControl-root:has(input[name="theme"]) .MuiInputBase-root,
+html[data-theme="dark"] #displayPreferencesPage .MuiFormControl-root:has(input[name="dashboardTheme"]) .MuiInputBase-root {
+    pointer-events: none !important;
+}
+
 
 /* 6. COMPONENTS */
 
@@ -668,8 +824,7 @@ a[data-role="button"]:hover {
 .fab:hover,
 .navMenuOption:hover,
 .listItem:hover,
-.actionSheetMenuItem:hover,
-.css-17c09up:hover {
+.actionSheetMenuItem:hover {
     background: rgb(var(--abyss-accent)) !important;
     color: #121212;
     font-weight: 700;
@@ -700,46 +855,21 @@ a[data-role="button"]:hover {
     border-radius: var(--abyss-radius);
 }
 
-.emby-button.show-focus:focus {
-    background: rgba(var(--abyss-accent), 0.5) !important;
-}
-
-.paper-icon-button-light.show-focus:focus {
-    color: rgb(var(--abyss-accent)) !important;
-}
-
 .emby-tab-button {
-    padding: 0.35em 1.25em !important;
-    margin: 0 2px !important;
-    border-radius: 50px !important;
-    height: auto !important;
-    min-height: auto !important;
-    line-height: 1.25 !important;
-    box-sizing: border-box !important;
+    padding: 0.5em 1.5em;
+    margin: 0 2.5px;
+    border-radius: 50px;
+    border: 3px solid transparent;
 }
 
 .emby-tab-button-active {
     background: rgb(var(--abyss-accent)) !important;
     color: #121212 !important;
-    border-radius: 50px !important;
+    border-radius: 50px;
 }
 
-.emby-tab-button-active .emby-button-foreground {
+.emby-tab-button-active:hover {
     color: #121212 !important;
-}
-
-.emby-tab-button.emby-tab-button-active:hover {
-    background: rgb(var(--abyss-accent)) !important;
-    color: #121212 !important;
-}
-
-.emby-tab-button.emby-tab-button-active:hover .emby-button-foreground {
-    color: #121212 !important;
-}
-
-.emby-tab-button:hover,
-.emby-tab-button:hover .emby-button-foreground {
-    color: rgb(var(--abyss-accent)) !important;
 }
 
 .button-flat:hover {
@@ -758,6 +888,21 @@ a[data-role="button"]:hover {
     margin-top: 48px !important;
     box-shadow: 0 0 24px 2px rgba(var(--abyss-accent), 0.2);
     z-index: 2;
+    color: rgba(245, 245, 247);
+}
+
+html[data-theme="dark"] #displayPreferencesPage form button[type="submit"].MuiButton-root {
+    min-height: 3.25rem;
+    border-radius: var(--abyss-radius);
+    color: #121212;
+    background-color: rgb(var(--abyss-accent)) !important;
+    box-shadow: 0 0 24px 2px rgba(var(--abyss-accent), 0.2);
+    font-weight: 700;
+}
+
+html[data-theme="dark"] #displayPreferencesPage form button[type="submit"].MuiButton-root:hover {
+    color: #121212;
+    background-color: rgba(var(--abyss-accent), 0.88) !important;
 }
 
 /* Active / played / link states */
@@ -767,20 +912,17 @@ a[data-role="button"]:hover {
 .playstatebutton-icon-played,
 .ratingbutton-icon-withrating,
 .paper-icon-button-light:hover:not(:disabled),
-.paper-icon-button-light:active:not(:disabled),
 .emby-tab-button:hover,
 .selectLabelFocused,
 .inputLabelFocused,
 .textareaLabelFocused,
 .buttonActive,
-.button-link,
-.button-link:hover,
-.metadataSidebarIcon {
-    color: rgb(var(--abyss-accent)) !important;
+.button-link {
+    color: rgb(var(--abyss-accent));
 }
 
 #itemDetailPage .button-link {
-    color: inherit !important;
+    text-align: left;
 }
 
 .ratingbutton-icon-withrating {
@@ -906,6 +1048,8 @@ div[data-role="controlgroup"] a[data-role="button"] {
     transition: transform 0.37s var(--abyss-ease) !important;
 }
 
+
+
 /* Card Indicators */
 
 .cardIndicators,
@@ -930,8 +1074,7 @@ div[data-role="controlgroup"] a[data-role="button"] {
 }
 
 .countIndicator {
-    background: rgba(var(--abyss-indicator), 0.8) !important;
-    color: #fff !important;
+    background: rgba(var(--abyss-accent), 0.8);
     box-shadow: none;
     border-radius: 10px !important;
     padding: 4px;
@@ -939,8 +1082,7 @@ div[data-role="controlgroup"] a[data-role="button"] {
 }
 
 .playedIndicator {
-    background: rgba(0, 0, 0, 0.4) !important;
-    color: #fff !important;
+    background: rgba(0, 0, 0, 0.4);
     box-shadow: none;
     border-radius: 10px !important;
     padding: 4px;
@@ -986,17 +1128,17 @@ div[data-role="controlgroup"] a[data-role="button"] {
 }
 
 .mdl-slider::-moz-range-thumb {
-    border-radius: var(--abyss-radius);
+    border-radius: 50%;
     background: rgb(var(--abyss-accent));
 }
 
 .mdl-slider::-ms-thumb {
-    border-radius: var(--abyss-radius);
+    border-radius: 50%;
     background: rgb(var(--abyss-accent));
 }
 
 .mdl-slider::-webkit-slider-thumb {
-    border-radius: var(--abyss-radius);
+    border-radius: 50%;
     background: rgb(var(--abyss-accent));
 }
 
@@ -1036,7 +1178,7 @@ div[data-role="controlgroup"] a[data-role="button"] {
 /* Progress Ring */
 
 .progressring-spiner {
-    border-color: rgb(var(--abyss-accent));
+    border-color: rgb(var(--abyss-accent)) !important;
     border-width: .35em;
 }
 
@@ -1347,6 +1489,7 @@ input[type="checkbox"]:focus+.checkboxOutline {
     padding: 1em 3em 2em 2em;
 }
 
+
 .playerStats-stat {
     align-items: baseline;
 }
@@ -1610,6 +1753,7 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     border-radius: 2px;
 }
 
+
 /* 9. DASHBOARD & ADMIN */
 
 .dashboardSection h3 {
@@ -1630,15 +1774,11 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     background-color: rgba(var(--abyss-accent), 0.35) !important;
 }
 
-.css-4yt2of {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-right: 1px solid rgba(var(--abyss-accent), 0.12);
+.navMenuOption-selected {
+    background: rgb(var(--abyss-accent)) !important;
+    color: #121212 !important;
 }
 
-.navMenuOption-selected,
-.css-17c09up.Mui-selected {
-    color: rgb(var(--abyss-accent));
-}
 
 /* 10. ITEM DETAIL PAGE */
 
@@ -1646,16 +1786,8 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     font-size: 120%;
 }
 
-#itemDetailPage .itemName.infoText.parentNameLast {
-    display: none;
-}
-
 .hide+.detailPageWrapperContainer .itemName {
     display: block !important;
-}
-
-#itemDetailPage .button-link {
-    color: inherit !important;
 }
 
 .sectionTitleTextButton:hover {
@@ -1691,6 +1823,56 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     height: 7px;
     background: rgba(0, 0, 0, 0.4);
     margin: .5em .8em;
+}
+
+#itemDetailPage .detailButton {
+    padding: 8px !important;
+    margin-right: 8px !important;
+}
+
+#itemDetailPage .btnPlay {
+    background: rgba(255, 255, 255, 0.95);
+    color: #111;
+    max-width: none !important;
+}
+
+#itemDetailPage .btnPlay:hover {
+    background: #fff;
+    color: #111 !important;
+    transform: scale(1.03);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.25);
+}
+
+#itemDetailPage .btnPlay .detailButton-content {
+    flex-direction: row !important;
+}
+
+#itemDetailPage .btnReplay {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#itemDetailPage .btnReplay:hover {
+    background: rgba(255, 255, 255, 1);
+    color: rgba(0, 0, 0, 0.9) !important;
+    transform: scale(1.05);
+}
+
+#itemDetailPage:has(.btnReplay.hide) .btnPlayTrailer {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#itemDetailPage:has(.btnReplay.hide) #itemDetailPage .btnPlayTrailer:hover {
+    background: rgba(255, 255, 255, 1);
+    color: rgba(0, 0, 0, 0.9) !important;
+    transform: scale(1.05);
 }
 
 /* 11. LOGIN PAGE */
@@ -1729,169 +1911,72 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     margin-bottom: 24px;
 }
 
+
 /* 12. CAST THUMBNAILS (responsive sizing) */
 
-@media all and (min-width: 131.25em) {
-
-    #castContent .card.overflowPortraitCard,
-    #guestCastContent .card.overflowPortraitCard {
-        width: 6.3vw !important;
-        font-size: 90% !important;
-    }
-
-    #castContent .cardScalable,
-    #guestCastContent .cardScalable {
-        width: calc(6.3vw - 0.6em) !important;
-        height: calc(6.3vw - 0.6em) !important;
-    }
+.layout-desktop #castContent .card.overflowPortraitCard,
+.layout-desktop #guestCastContent .card.overflowPortraitCard {
+    width: 10vw !important;
+    font-size: 90% !important;
 }
 
-@media all and (min-width: 120em) and (max-width: 131.25em) {
-
-    #castContent .card.overflowPortraitCard,
-    #guestCastContent .card.overflowPortraitCard {
-        width: 6.4vw !important;
-        font-size: 90% !important;
-    }
-
-    #castContent .cardScalable,
-    #guestCastContent .cardScalable {
-        width: calc(6.4vw - 0.6em) !important;
-        height: calc(6.4vw - 0.6em) !important;
-    }
+.layout-desktop #castContent .cardScalable,
+.layout-desktop #guestCastContent .cardScalable {
+    width: calc(10vw - 0.6em) !important;
+    height: calc(14vw - 0.6em) !important;
 }
 
-@media all and (min-width: 100em) and (max-width: 120em) {
-
-    #castContent .card.overflowPortraitCard,
-    #guestCastContent .card.overflowPortraitCard {
-        width: 7.6vw !important;
-        font-size: 90% !important;
-    }
-
-    #castContent .cardScalable,
-    #guestCastContent .cardScalable {
-        width: calc(7.6vw - 0.6em) !important;
-        height: calc(7.6vw - 0.6em) !important;
-    }
+.layout-tablet #castContent .card.overflowPortraitCard,
+.layout-tablet #guestCastContent .card.overflowPortraitCard {
+    width: 17vw !important;
+    font-size: 90% !important;
 }
 
-@media all and (min-width: 87.5em) and (max-width: 100em) {
-
-    #castContent .card.overflowPortraitCard,
-    #guestCastContent .card.overflowPortraitCard {
-        width: 9.3vw !important;
-        font-size: 90% !important;
-    }
-
-    #castContent .cardScalable,
-    #guestCastContent .cardScalable {
-        width: calc(9.3vw - 0.6em) !important;
-        height: calc(9.3vw - 0.6em) !important;
-    }
+.layout-tablet #castContent .cardScalable,
+.layout-tablet #guestCastContent .cardScalable {
+    width: calc(17vw - 0.6em) !important;
+    height: calc(12vw - 0.6em) !important;
 }
 
-@media all and (min-width: 75em) and (max-width: 87.5em) {
-
-    #castContent .card.overflowPortraitCard,
-    #guestCastContent .card.overflowPortraitCard {
-        width: 10.5vw !important;
-        font-size: 90% !important;
-    }
-
-    #castContent .cardScalable,
-    #guestCastContent .cardScalable {
-        width: calc(10.5vw - 0.6em) !important;
-        height: calc(10.5vw - 0.6em) !important;
-    }
+.layout-mobile #castContent .card.overflowPortraitCard,
+.layout-mobile #guestCastContent .card.overflowPortraitCard {
+    width: 35vw !important;
+    font-size: 90% !important;
 }
 
-@media all and (min-width: 50em) and (max-width: 75em) {
-
-    #castContent .card.overflowPortraitCard,
-    #guestCastContent .card.overflowPortraitCard {
-        width: 15vw !important;
-        font-size: 90% !important;
-    }
-
-    #castContent .cardScalable,
-    #guestCastContent .cardScalable {
-        width: calc(15vw - 0.6em) !important;
-        height: calc(15vw - 0.6em) !important;
-    }
+.layout-mobile #castContent .cardScalable,
+.layout-mobile #guestCastContent .cardScalable {
+    width: calc(35vw - 0.6em) !important;
+    height: calc(35vw - 0.6em) !important;
 }
 
-@media all and (min-width: 43.75em) and (max-width: 50em) {
-
-    #castContent .card.overflowPortraitCard,
-    #guestCastContent .card.overflowPortraitCard {
-        width: 20.1vw !important;
-        font-size: 90% !important;
-    }
-
-    #castContent .cardScalable,
-    #guestCastContent .cardScalable {
-        width: calc(20.1vw - 0.6em) !important;
-        height: calc(20.1vw - 0.6em) !important;
-    }
+.layout-mobile .innerCardFooterClear {
+    padding-right: 24px !important;
 }
 
-@media all and (min-width: 25em) and (max-width: 43.75em) {
+@media (orientation: landscape) and (max-height: 500px) {
 
-    #castContent .card.overflowPortraitCard,
-    #guestCastContent .card.overflowPortraitCard {
+    .layout-mobile #castContent .card.overflowPortraitCard,
+    .layout-mobile #guestCastContent .card.overflowPortraitCard {
         width: 31.2vw !important;
         font-size: 90% !important;
     }
 
-    #castContent .cardScalable,
-    #guestCastContent .cardScalable {
+    .layout-mobile #castContent .cardScalable,
+    .layout-mobile #guestCastContent .cardScalable {
         width: calc(31.2vw - 0.6em) !important;
         height: calc(31.2vw - 0.6em) !important;
     }
 
-    .innerCardFooterClear {
+    .layout-mobile .innerCardFooterClear {
         padding-right: 24px !important;
-    }
-}
-
-@media (max-width: 1024px) and (orientation: landscape) and (max-height: 500px) {
-
-    #castContent .card.overflowPortraitCard,
-    #guestCastContent .card.overflowPortraitCard {
-        width: 31.2vw !important;
-        font-size: 90% !important;
-    }
-
-    #castContent .cardScalable,
-    #guestCastContent .cardScalable {
-        width: calc(31.2vw - 0.6em) !important;
-        height: calc(31.2vw - 0.6em) !important;
-    }
-
-    .innerCardFooterClear {
-        padding-right: 24px !important;
-    }
-}
-
-@media all and (max-width: 25em) {
-
-    #castContent .card.overflowPortraitCard,
-    #guestCastContent .card.overflowPortraitCard {
-        width: 40vw !important;
-        font-size: 90% !important;
-    }
-
-    #castContent .cardScalable,
-    #guestCastContent .cardScalable {
-        width: calc(40vw - 0.6em) !important;
-        height: calc(40vw - 0.6em) !important;
     }
 }
 
 /* 13. RESPONSIVE / MEDIA QUERIES */
 
 /* Mobile layout tweaks */
+
 .layout-mobile .detailPagePrimaryContainer {
     background: transparent;
 }
@@ -1900,12 +1985,42 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     border-bottom: none;
 }
 
+.layout-mobile #itemDetailPage .parentName,
+.layout-mobile #itemDetailPage .parentNameLast,
+.layout-mobile #itemDetailPage .itemName.subtitle {
+    text-align: left;
+    justify-content: left;
+}
+
+.layout-mobile #itemDetailPage .mainDetailButtons,
+.layout-mobile #itemDetailPage .itemMiscInfo {
+    justify-content: left;
+}
+
 .layout-mobile .itemBackdrop {
-    margin-top: 4rem;
+    position: relative;
+    background-size: cover;
+    background-position: center 20%;
+    background-repeat: no-repeat;
+    margin-top: 0;
+    z-index: 0;
+    -webkit-mask-image:
+        linear-gradient(to bottom, black 40%, transparent 100%),
+        linear-gradient(to right, transparent 0%, black 25%, black 70%, transparent 100%),
+        linear-gradient(to bottom, transparent 0%, black 8%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+        linear-gradient(to bottom, black 40%, transparent 100%),
+        linear-gradient(to right, transparent 0%, black 25%, black 70%, transparent 100%),
+        linear-gradient(to bottom, transparent 0%, black 8%);
+    mask-composite: intersect;
 }
 
 .layout-mobile .detailLogo {
-    display: none !important;
+    margin-top: -15vh;
+    margin-bottom: 4vh !important;
+    margin-left: 40vw !important;
+    width: 50vw !important;
 }
 
 .layout-mobile .sectionTitleTextButton>.material-icons {
@@ -1924,19 +2039,138 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     display: block;
 }
 
-/* Desktop layout */
-.layout-desktop .detailImageContainer .card {
-    position: fixed !important;
-    top: 10% !important;
-}
-
-.layout-mobile .detailImageContainer .card {
-    position: absolute !important;
-}
-
 .layout-mobile :not(.sectionTitleContainer-cards)>.sectionTitle-cards {
     padding-top: 0em;
 }
+
+/* TV Layout */
+
+.card:focus .cardBox.visualCardBox,
+.card:focus .cardBox:not(.visualCardBox) .cardScalable {
+    border-radius: 24px !important;
+    border: 0.3em solid rgb(var(--abyss-accent)) !important;
+    transition: all 0.5s !important;
+}
+
+.layout-tv .pageTitle,
+.layout-tv .cardText {
+    font-size: revert;
+}
+
+.layout-tv .emby-tab-button {
+    padding: 0.3em 1.2em;
+    margin: 4px;
+}
+
+.layout-tv .sliderMarker {
+    height: 24px !important;
+}
+
+.layout-tv .chapterThumbContainer {
+    transform: scale(1.5) !important;
+    top: -72px !important;
+}
+
+.emby-button.show-focus:focus,
+.headerButton.show-focus:focus,
+.actionSheetMenuItem.show-focus:focus {
+    background: rgb(var(--abyss-accent)) !important;
+    color: #121212 !important;
+}
+
+.headerButton.show-focus:focus,
+.raised.button-submit.emby-button.show-focus:focus {
+    transform: scale(1.02) !important;
+    transition: transform 0.3s !important;
+    margin-top: .4em !important;
+    margin-bottom: .4em !important;
+}
+
+.headerUserButton.show-focus:focus {
+    transform: none !important;
+}
+
+#itemDetailPage .emby-button.show-focus:focus {
+    transform: scale(1.1) !important;
+    padding: 0 .4em;
+    margin: .4em;
+    border-radius: 10px;
+    background: rgb(var(--abyss-accent)) !important;
+    color: #121212 !important;
+}
+
+.emby-tab-button.show-focus {
+    background: transparent;
+    transform: none !important;
+    color: #999;
+}
+
+.emby-button.emby-tab-button.show-focus:focus {
+    background: transparent !important;
+    transform: none !important;
+    border-color: rgb(var(--abyss-accent));
+    color: rgb(var(--abyss-accent)) !important;
+}
+
+.emby-tab-button.show-focus:focus .emby-button-foreground {
+    transform: scale(1.1) !important;
+    font-weight: 500;
+    transition: 0.3s;
+}
+
+.emby-tab-button.show-focus:focus.emby-tab-button-active {
+    background: rgb(var(--abyss-accent)) !important;
+    color: #121212 !important;
+    border-color: transparent !important;
+    border-radius: 50px;
+}
+
+.emby-select-withcolor {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.libraryPage .paper-icon-button-light.show-focus:focus,
+#videoOsdPage .paper-icon-button-light.show-focus:focus {
+    background: rgb(var(--abyss-accent)) !important;
+    color: #121212 !important;
+    padding: 4px !important;
+}
+
+/* Desktop layout & TV*/
+.layout-desktop #itemDetailPage .btnPlay,
+.layout-tv #itemDetailPage .btnPlay {
+    margin-right: 12px !important;
+    padding: .4em 1.4em .4em 1em !important;
+}
+
+.layout-desktop #itemDetailPage .btnPlay .detailButton-content::after,
+.layout-tv #itemDetailPage .btnPlay .detailButton-content::after {
+    content: "Play";
+    margin-left: 0.45em;
+    font-weight: 700;
+    font-size: 0.9em;
+}
+
+.layout-desktop #itemDetailPage:has(.btnReplay:not(.hide)) .btnPlay .detailButton-content::after,
+.layout-tv #itemDetailPage:has(.btnReplay:not(.hide)) .btnPlay .detailButton-content::after {
+    content: "Resume";
+}
+
+.layout-tv .detailImageContainer .card,
+.layout-desktop .detailImageContainer .card {
+    position: fixed !important;
+    top: 15% !important;
+}
+
+.layout-tv .detailPageSecondaryContainer.padded-left,
+.layout-desktop .detailPageSecondaryContainer.padded-left {
+    padding-left: max(env(safe-area-inset-left), 32.9%);
+}
+
+
 
 .withSectionTabs .headerTop {
     width: 100% !important;
@@ -2394,6 +2628,7 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {
@@ -2403,89 +2638,6 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
         transition-duration: 0.01ms !important;
     }
 }
-
-/* Intro Skipper Plugin Integration */
-.skip-intro,
-.btnSkipIntro,
-.btnSkipEpisodeIntro,
-button[class*="skip-intro"],
-button[class*="SkipIntro"] {
-    background-color: rgba(var(--abyss-glass-tint), 0.75) !important;
-    color: rgb(var(--abyss-accent)) !important;
-    border: 1px solid rgba(245, 245, 247, 0.2) !important;
-    border-radius: var(--abyss-radius) !important;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2) !important;
-    font-family: "Google Sans", sans-serif !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.02em;
-    padding: 0.6em 1.2em !important;
-    backdrop-filter: blur(var(--abyss-glass-blur)) !important;
-    -webkit-backdrop-filter: blur(var(--abyss-glass-blur)) !important;
-    transition: background-color 0.3s var(--abyss-ease),
-                color 0.3s var(--abyss-ease),
-                transform 0.2s var(--abyss-ease),
-                border-color 0.3s var(--abyss-ease) !important;
-}
-
-/* Hover & Focus State */
-.skip-intro:hover,
-.btnSkipIntro:hover,
-.btnSkipEpisodeIntro:hover,
-button[class*="skip-intro"]:hover,
-button[class*="SkipIntro"]:hover {
-    background-color: rgb(var(--abyss-accent)) !important;
-    color: #121212 !important;
-    border-color: rgb(var(--abyss-accent)) !important;
-    transform: translateY(-2px);
-}
-
-/* Active State */
-.skip-intro:active,
-.btnSkipIntro:active,
-.btnSkipEpisodeIntro:active,
-button[class*="skip-intro"]:active,
-button[class*="SkipIntro"]:active {
-    transform: translateY(0);
-}
-
-/* Invite a friend drawer button with subtitle */
-.btnInviteFriend {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start !important;
-    text-align: left !important;
-}
-
-.btnInviteFriend.hide {
-    display: none !important;
-}
-
-.btnInviteFriend .inviteTextContainer {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    line-height: 1.25;
-}
-
-.btnInviteFriend .navMenuOptionText {
-    flex-grow: 0 !important;
-    text-align: left !important;
-    margin: 0 !important;
-}
-
-.btnInviteFriend .inviteSubtitle {
-    font-size: 0.76rem;
-    font-weight: 500;
-    opacity: 0.65;
-    letter-spacing: 0.01em;
-    margin-top: 1px;
-}
-
-/* On hover, text color inherits row hover color (#121212) naturally */
-.btnInviteFriend:hover .inviteSubtitle {
-    opacity: 0.8;
-}
-
 /* ==========================================================================
    NATIVE SPOTLIGHT COMPONENT STYLING
    ========================================================================== */
