@@ -27,6 +27,7 @@ module.exports = merge(common, {
         aggregateTimeout: 300
     },
     devServer: {
+        historyApiFallback: true,
         allowedHosts: 'all',
         static: false,
         compress: true,

@@ -76,8 +76,12 @@ export const ForgotPasswordPage = () => {
                     style={{ textAlign: 'center', margin: '0 auto' }}
                     onSubmit={handleSubmit}
                 >
+                    <div className='flex align-items-center justify-content-center' style={{ marginBottom: '1.5em' }}>
+                        <div className='pageTitleWithDefaultLogo' style={{ height: '3.5em', width: '12em', backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }} />
+                    </div>
+
                     <div style={{ textAlign: 'left' }}>
-                        <h1>{globalize.translate('ButtonForgotPassword')}</h1>
+                        <h1 style={{ marginBottom: '1em' }}>{globalize.translate('ButtonForgotPassword')}</h1>
 
                         <div className='inputContainer'>
                             <Input
