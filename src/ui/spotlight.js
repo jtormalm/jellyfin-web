@@ -362,14 +362,12 @@ export class NativeSpotlight {
         playbackManager.play({
             items: [item]
         }).catch(() => {
-            const detailId = item.Type === 'Episode' ? item.SeriesId || item.Id : item.Id;
-            appRouter.showItem(detailId);
+            appRouter.showItem(item.Id);
         });
     }
 
     updateContent(item, artwork) {
         const isEpisode = item.Type === 'Episode';
-        const detailId = isEpisode ? item.SeriesId || item.Id : item.Id;
         const title = isEpisode ? item.SeriesName || item.Name : item.Name;
 
         if (artwork.backdrop) {
@@ -425,13 +423,13 @@ export class NativeSpotlight {
 
         const infoButton = document.createElement('a');
         infoButton.className = 'spotlight-btn spotlight-btn-info';
-        infoButton.href = `#/details?id=${detailId}`;
+        infoButton.href = `#/details?id=${item.Id}`;
         infoButton.setAttribute('aria-label', `View details for ${title}`);
         this.setButtonContent(infoButton, SVG_INFO);
         infoButton.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            appRouter.showItem(detailId);
+            appRouter.showItem(item.Id);
         });
 
         while (this.buttons.firstChild) this.buttons.removeChild(this.buttons.firstChild);
@@ -453,7 +451,7 @@ export class NativeSpotlight {
         this.plot.textContent = item.Overview || '';
 
         this.clickzone.setAttribute('aria-label', `View details for ${title}`);
-        this.clickzone.onclick = () => appRouter.showItem(detailId);
+        this.clickzone.onclick = () => appRouter.showItem(item.Id);
     }
 
     async renderItem(index) {
