@@ -359,8 +359,10 @@ export class NativeSpotlight {
     }
 
     triggerPlayback(item) {
+        const startPositionTicks = item._source === 'resume' ? item.UserData?.PlaybackPositionTicks || 0 : 0;
         playbackManager.play({
-            items: [item]
+            items: [item],
+            startPositionTicks
         }).catch(() => {
             appRouter.showItem(item.Id);
         });
