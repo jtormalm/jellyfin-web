@@ -1,4 +1,5 @@
 import { playbackManager } from '../../../components/playback/playbackmanager';
+import { ServerConnections } from 'lib/jellyfin-apiclient';
 import Events from '../../../utils/events';
 
 const DRIFT_TRIGGER_SEC = 0.15;
@@ -33,6 +34,10 @@ class OWPPlayback {
         this.lastHardSeekTime = 0;
         this.lastRateChangeTime = 0;
         this.isCorrectingRate = false;
+
+        this.lastBroadcastMediaId = null;
+        this.currentMediaId = null;
+        this.isLoadingMedia = null;
     }
 
     init(owpClient) {
@@ -42,13 +47,16 @@ class OWPPlayback {
         this.client.on('room-left', () => this.onRoomLeft());
         this.client.on('player-event', (payload, serverTs) => this.onPlayerEvent(payload, serverTs));
         this.client.on('state-update', (payload, serverTs) => this.onStateUpdate(payload, serverTs));
+        this.client.on('change-media', (data) => this.onChangeMedia(data));
+        this.client.on('participant-joined', () => this.onParticipantJoined());
 
         Events.on(playbackManager, 'playerchange', () => this.bindCurrentVideo());
-        Events.on(playbackManager, 'playbackstart', () => this.bindCurrentVideo());
+        Events.on(playbackManager, 'playbackstart', (e, player) => this.onPlaybackStart(player));
         Events.on(playbackManager, 'playbackstop', () => {
             this.normalizePlaybackRate();
             this.unbindVideo();
-            if (this.client?.isInRoom()) {
+            if (this.client?.isInRoom() && !this.isLoadingMedia) {
+                console.info('[OWPPlayback] Exited playback -> leaving watch party');
                 this.client.leaveRoom();
             }
         });
@@ -94,11 +102,25 @@ class OWPPlayback {
         this.unbindVideo();
         this.video = video;
 
-        const onPlay = () => this.broadcastHost('play');
+        const onPlay = () => {
+            if (this.client.isHost) {
+                this.broadcastHost('play');
+            } else if (this.client.isInRoom() && !this.isSyncing) {
+                if (this.lastSyncPlayState === 'paused' && !video.paused) {
+                    video.pause();
+                }
+            }
+        };
 
         const onPause = () => {
-            if (!this.isBuffering && !video.seeking) {
-                this.broadcastHost('pause');
+            if (this.client.isHost) {
+                if (!this.isBuffering && !video.seeking) {
+                    this.broadcastHost('pause');
+                }
+            } else if (this.client.isInRoom() && !this.isSyncing) {
+                if (this.lastSyncPlayState === 'playing' && video.paused && !this.isBuffering) {
+                    video.play().catch(() => { /* autoplay blocked */ });
+                }
             }
         };
 
@@ -110,6 +132,14 @@ class OWPPlayback {
                 this.lastHostSeekSentAt = now;
                 this.lastHostSentPosition = video.currentTime;
                 this.broadcastHost('seek');
+            } else if (!this.client.isHost && this.client.isInRoom() && !this.isSyncing && this.lastSyncServerTs) {
+                const elapsed = this.lastSyncPlayState === 'playing' ?
+                    Math.max(0, this.client.getServerNow() - this.lastSyncServerTs) / 1000 : 0;
+                const expected = this.lastSyncPosition + elapsed;
+                if (Math.abs(video.currentTime - expected) > 1.5) {
+                    this.startSyncing(1000);
+                    video.currentTime = expected;
+                }
             }
         };
 
@@ -262,22 +292,34 @@ class OWPPlayback {
     onRoomJoined(data) {
         this.bindCurrentVideo();
 
-        if (!data.isHost && data.state) {
-            this.lastSyncPosition = data.state.position || 0;
-            this.lastSyncPlayState = data.state.play_state || 'paused';
-            this.lastSyncServerTs = data.serverTs || this.client.getServerNow();
+        if (!data.isHost) {
+            this.currentMediaId = data.mediaId || null;
+            if (data.mediaId) {
+                this.loadAndPlayMedia(data.mediaId, data.state?.position || 0, data.state?.play_state || 'playing');
+            } else if (data.state) {
+                this.lastSyncPosition = data.state.position || 0;
+                this.lastSyncPlayState = data.state.play_state || 'paused';
+                this.lastSyncServerTs = data.serverTs || this.client.getServerNow();
 
-            const video = this.video || this.getVideo();
-            if (video) {
-                this.startSyncing(1500);
-                const elapsed = this.lastSyncPlayState === 'playing' ?
-                    Math.max(0, this.client.getServerNow() - this.lastSyncServerTs) / 1000 : 0;
-                video.currentTime = this.lastSyncPosition + elapsed;
-                if (this.lastSyncPlayState === 'playing') {
-                    video.play().catch((err) => console.debug('[OWPPlayback] play prevented:', err));
-                } else {
-                    video.pause();
+                const video = this.video || this.getVideo();
+                if (video) {
+                    this.startSyncing(1500);
+                    const elapsed = this.lastSyncPlayState === 'playing' ?
+                        Math.max(0, this.client.getServerNow() - this.lastSyncServerTs) / 1000 : 0;
+                    video.currentTime = this.lastSyncPosition + elapsed;
+                    if (this.lastSyncPlayState === 'playing') {
+                        video.play().catch((err) => console.debug('[OWPPlayback] play prevented:', err));
+                    } else {
+                        video.pause();
+                    }
                 }
+            }
+        } else {
+            const currentPlayer = playbackManager.getCurrentPlayer();
+            const currentItem = currentPlayer ? playbackManager.currentItem(currentPlayer) : null;
+            if (currentItem?.Id) {
+                this.lastBroadcastMediaId = currentItem.Id;
+                this.currentMediaId = currentItem.Id;
             }
         }
     }
@@ -287,6 +329,116 @@ class OWPPlayback {
         this.lastSyncPosition = 0;
         this.lastSyncServerTs = 0;
         this.lastSyncPlayState = 'paused';
+        this.lastBroadcastMediaId = null;
+        this.currentMediaId = null;
+        this.isLoadingMedia = null;
+    }
+
+    onPlaybackStart(player) {
+        this.bindCurrentVideo();
+        if (this.client?.isHost && this.client?.isInRoom()) {
+            const currentPlayer = player || playbackManager.getCurrentPlayer();
+            const currentItem = currentPlayer ? playbackManager.currentItem(currentPlayer) : null;
+            if (currentItem?.Id && currentItem.Id !== this.lastBroadcastMediaId) {
+                this.lastBroadcastMediaId = currentItem.Id;
+                this.currentMediaId = currentItem.Id;
+                const video = this.video || this.getVideo();
+                const startPos = (video && !Number.isNaN(video.currentTime)) ? video.currentTime : 0;
+                console.info('[OWPPlayback] Host started media, broadcasting change_media:', currentItem.Id, 'pos:', startPos);
+                this.client.sendMediaChange(currentItem.Id, startPos);
+            }
+        } else if (!this.client?.isHost && this.client?.isInRoom()) {
+            const currentPlayer = player || playbackManager.getCurrentPlayer();
+            const currentItem = currentPlayer ? playbackManager.currentItem(currentPlayer) : null;
+            if (currentItem?.Id && this.currentMediaId && currentItem.Id !== this.currentMediaId && !this.isLoadingMedia) {
+                console.info('[OWPPlayback] Participant started different media:', currentItem.Id, 'expected:', this.currentMediaId, '-> leaving watch party');
+                this.client.leaveRoom();
+            }
+        }
+    }
+
+    onParticipantJoined() {
+        if (this.client?.isHost && this.client?.isInRoom()) {
+            const currentPlayer = playbackManager.getCurrentPlayer();
+            const currentItem = currentPlayer ? playbackManager.currentItem(currentPlayer) : null;
+            const video = this.video || this.getVideo();
+            if (currentItem?.Id) {
+                const pos = (video && !Number.isNaN(video.currentTime)) ? video.currentTime : 0;
+                console.info('[OWPPlayback] Participant joined, broadcasting current media:', currentItem.Id, 'pos:', pos);
+                this.client.sendMediaChange(currentItem.Id, pos);
+            }
+        }
+    }
+
+    onChangeMedia(data) {
+        if (this.client?.isHost || !data.media_id) return;
+        this.currentMediaId = data.media_id;
+        console.info('[OWPPlayback] Host changed media:', data.media_id, 'pos:', data.start_pos);
+        this.loadAndPlayMedia(data.media_id, data.start_pos || 0, 'playing');
+    }
+
+    async loadAndPlayMedia(mediaId, position = 0, playState = 'playing') {
+        if (!mediaId) return;
+
+        const currentPlayer = playbackManager.getCurrentPlayer();
+        let currentItem = null;
+        if (currentPlayer) {
+            try {
+                currentItem = playbackManager.currentItem(currentPlayer);
+            } catch {
+                currentItem = null;
+            }
+        }
+
+        if (currentItem?.Id === mediaId) {
+            console.info('[OWPPlayback] Already playing media:', mediaId);
+            const video = this.video || this.getVideo();
+            if (video && typeof position === 'number') {
+                if (Math.abs(video.currentTime - position) > 1.0) {
+                    video.currentTime = position;
+                }
+                if (playState === 'playing' && video.paused) {
+                    video.play().catch(() => { /* autoplay blocked */ });
+                } else if (playState === 'paused' && !video.paused) {
+                    video.pause();
+                }
+            }
+            return;
+        }
+
+        if (this.isLoadingMedia === mediaId) return;
+        this.isLoadingMedia = mediaId;
+
+        try {
+            console.info('[OWPPlayback] Auto-loading watch party media:', mediaId);
+            const apiClient = ServerConnections.currentApiClient();
+            const userId = apiClient.getCurrentUserId?.() || apiClient._currentUserId;
+            const item = await apiClient.getItem(userId, mediaId);
+            if (!item) return;
+
+            this.startSyncing(3000);
+            this.lastSyncPosition = position;
+            this.lastSyncServerTs = this.client.getServerNow();
+            this.lastSyncPlayState = playState;
+            this.currentMediaId = mediaId;
+
+            const startPositionTicks = Math.floor(Math.max(0, position) * 10000000);
+            await playbackManager.play({
+                items: [item],
+                startPositionTicks
+            });
+
+            if (playState === 'paused') {
+                setTimeout(() => {
+                    const v = this.video || this.getVideo();
+                    if (v) v.pause();
+                }, 600);
+            }
+        } catch (err) {
+            console.error('[OWPPlayback] Error loading watch party media:', err);
+        } finally {
+            this.isLoadingMedia = null;
+        }
     }
 
     onPlayerEvent(payload, serverTs) {

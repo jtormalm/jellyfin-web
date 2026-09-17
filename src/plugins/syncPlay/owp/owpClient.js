@@ -34,6 +34,7 @@ class OWPClient {
 
         this.roomId = '';
         this.roomName = '';
+        this.hostName = '';
         this.isHost = false;
         this.inRoom = false;
         this.participantCount = 0;
@@ -91,7 +92,11 @@ class OWPClient {
     }
 
     getRoomName() {
-        return this.roomName || 'Watch Party';
+        return this.roomName || 'Watch party';
+    }
+
+    getHostName() {
+        return this.hostName || (this.isHost ? this.userName : 'Host');
     }
 
     getParticipantCount() {
@@ -386,21 +391,25 @@ class OWPClient {
                 const wasInRoom = this.inRoom;
                 this.inRoom = true;
                 this.roomId = msg.room || '';
-                const rawName = msg.payload?.name || 'Watch Party';
+                const rawName = msg.payload?.name || 'Watch party';
                 const match = rawName.match(/^Room de (.+)$/);
+                this.hostName = match ? match[1] : '';
                 this.roomName = match ?
                     globalize.translate('SyncPlayGroupDefaultTitle', match[1]) :
                     rawName;
                 this.participantCount = msg.payload?.participant_count || 1;
                 if (!this.clientId && msg.client) this.clientId = msg.client;
                 this.isHost = (msg.payload?.host_id === this.clientId);
+                if (this.isHost && this.userName) {
+                    this.hostName = this.userName;
+                }
 
                 if (typeof msg.server_ts === 'number') {
                     this.serverOffsetMs = msg.server_ts - this.nowMs();
                 }
 
                 if (!wasInRoom) {
-                    toast({ text: globalize.translate('MessageSyncPlayEnabled') || 'Joined Watch Party' });
+                    toast({ text: this.isHost ? 'Watch party created' : 'Joined watch party' });
                 }
 
                 this.emit('room-joined', {
@@ -424,6 +433,9 @@ class OWPClient {
                     this.participantCount = msg.payload.participant_count;
                     if (this.participantCount > prevCount) {
                         toast({ text: 'A participant joined the watch party' });
+                        if (this.isHost) {
+                            this.emit('participant-joined', this.participantCount);
+                        }
                     } else if (msg.type === 'client_left') {
                         toast({ text: 'A participant left the watch party' });
                     }
@@ -431,8 +443,20 @@ class OWPClient {
                 }
                 break;
 
+            case 'chat_message':
+                try {
+                    const data = typeof msg.payload?.text === 'string' ? JSON.parse(msg.payload.text) : null;
+                    if (data && data.action === 'change_media' && data.media_id) {
+                        console.info('[OWPClient] Received change_media event:', data);
+                        this.emit('change-media', data);
+                    }
+                } catch {
+                    // Ignore regular non-JSON chat messages
+                }
+                break;
+
             case 'room_closed':
-                toast({ text: msg.payload?.reason || 'The watch party was closed' });
+                toast({ text: msg.payload?.reason || 'Watch party ended' });
                 this.resetRoomState();
                 break;
 
@@ -483,9 +507,10 @@ class OWPClient {
 
     leaveRoom() {
         if (!this.inRoom && !this.roomId) return;
+        const wasHost = this.isHost;
         this.send('leave_room');
         this.resetRoomState();
-        toast({ text: globalize.translate('MessageSyncPlayDisabled') || 'Left watch party' });
+        toast({ text: wasHost ? 'Watch party ended' : 'Left watch party' });
     }
 
     resetRoomState() {
@@ -493,6 +518,7 @@ class OWPClient {
         this.inRoom = false;
         this.roomId = '';
         this.roomName = '';
+        this.hostName = '';
         this.isHost = false;
         this.participantCount = 0;
 
@@ -508,6 +534,17 @@ class OWPClient {
     sendStateUpdate(position, playState) {
         if (!this.isHost || !this.inRoom) return;
         this.send('state_update', { position, ['play_state']: playState });
+    }
+
+    sendMediaChange(mediaId, startPos = 0) {
+        if (!this.isHost || !this.inRoom || !mediaId) return;
+        this.send('chat_message', {
+            text: JSON.stringify({
+                action: 'change_media',
+                ['media_id']: mediaId,
+                ['start_pos']: typeof startPos === 'number' ? startPos : 0
+            })
+        });
     }
 }
 

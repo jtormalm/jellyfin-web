@@ -103,39 +103,44 @@ class GroupSelectionMenu {
             }
         }
         const video = document.querySelector('video');
-
-        if (!video || !currentItem?.Id) {
-            toast({
-                text: 'Start playing a video first to start or join a Watch Party'
-            });
-            return;
-        }
+        const canCreate = Boolean(video && currentItem?.Id);
 
         try {
             const apiClient = ServerConnections.currentApiClient();
             const user = await ServerConnections.user(apiClient);
             const policy = user?.localUser?.Policy || user?.Policy || {};
             const allRooms = await owpClient.fetchRooms();
-            const matchingRooms = allRooms.filter((r) => r.media_id === currentItem.Id);
+            const userId = apiClient.getCurrentUserId?.() || apiClient._currentUserId;
 
-            const menuItems = matchingRooms.map((room) => {
+            const mediaTitles = await Promise.all(allRooms.map(async (room) => {
+                if (!room.media_id) return null;
+                try {
+                    const item = await apiClient.getItem(userId, room.media_id);
+                    return item?.SeriesName ? `${item.SeriesName} - ${item.Name}` : item?.Name || null;
+                } catch {
+                    return null;
+                }
+            }));
+
+            const menuItems = allRooms.map((room, index) => {
                 const count = room.count || 1;
                 const rawName = room.name || 'Watch Party';
                 const match = rawName.match(/^Room de (.+)$/);
-                const displayName = match ?
+                const baseName = match ?
                     globalize.translate('SyncPlayGroupDefaultTitle', match[1]) :
                     rawName;
+                const mediaTitle = mediaTitles[index];
 
                 return {
-                    name: displayName,
+                    name: `${baseName} (${count})`,
                     icon: 'groups',
                     id: room.id,
                     selected: false,
-                    secondaryText: `${count} participant${count === 1 ? '' : 's'}`
+                    secondaryText: mediaTitle || undefined
                 };
             });
 
-            if (policy.SyncPlayAccess !== 'JoinGroups') {
+            if (canCreate && policy.SyncPlayAccess !== 'JoinGroups') {
                 menuItems.push({
                     name: globalize.translate('LabelSyncPlayNewGroup'),
                     icon: 'add',
@@ -146,8 +151,15 @@ class GroupSelectionMenu {
             }
 
             if (menuItems.length === 0) {
-                toast({ text: globalize.translate('MessageSyncPlayCreateGroupDenied') });
-                return;
+                menuItems.push({
+                    name: 'No watch parties available',
+                    icon: 'info',
+                    id: 'no-groups',
+                    selected: false,
+                    secondaryText: canCreate ?
+                        globalize.translate('MessageSyncPlayCreateGroupDenied') :
+                        'Start playing a video to create one'
+                });
             }
 
             const id = await actionsheet.show({
@@ -161,7 +173,7 @@ class GroupSelectionMenu {
             if (id === 'new-group') {
                 const startPos = !Number.isNaN(video.currentTime) ? video.currentTime : 0;
                 owpClient.createRoom(currentItem.Id, startPos);
-            } else if (id) {
+            } else if (id && id !== 'no-groups') {
                 owpClient.joinRoom(id);
             }
         } catch (error) {
