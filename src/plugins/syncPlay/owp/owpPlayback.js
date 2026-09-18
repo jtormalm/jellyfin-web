@@ -12,6 +12,7 @@ const SYNC_LOOP_MS = 500;
 const STATE_UPDATE_INTERVAL_MS = 1000;
 const HARD_SEEK_COOLDOWN_MS = 4000;
 const NEUTRAL_DWELL_MS = 2000;
+const HOST_TRANSITION_GRACE_MS = 5000;
 
 class OWPPlayback {
     constructor() {
@@ -40,6 +41,7 @@ class OWPPlayback {
         this.lastBroadcastMediaId = null;
         this.currentMediaId = null;
         this.isLoadingMedia = null;
+        this.pendingLeaveTimer = null;
     }
 
     init(owpClient) {
@@ -57,7 +59,26 @@ class OWPPlayback {
         Events.on(playbackManager, 'playbackstop', () => {
             this.normalizePlaybackRate();
             this.unbindVideo();
-            if (this.client?.isInRoom() && !this.isLoadingMedia) {
+
+            if (!this.client?.isInRoom() || this.isLoadingMedia) return;
+
+            if (this.pendingLeaveTimer) {
+                clearTimeout(this.pendingLeaveTimer);
+                this.pendingLeaveTimer = null;
+            }
+
+            if (this.client.isHost) {
+                // Give the host a brief window to start a new item (e.g. next
+                // episode) before tearing down the party for everyone.
+                console.info('[OWPPlayback] Host playback stopped -> waiting briefly for a new item before leaving watch party');
+                this.pendingLeaveTimer = setTimeout(() => {
+                    this.pendingLeaveTimer = null;
+                    if (this.client?.isInRoom()) {
+                        console.info('[OWPPlayback] Host did not resume playback -> leaving watch party');
+                        this.client.leaveRoom();
+                    }
+                }, HOST_TRANSITION_GRACE_MS);
+            } else {
                 console.info('[OWPPlayback] Exited playback -> leaving watch party');
                 this.client.leaveRoom();
             }
@@ -356,9 +377,18 @@ class OWPPlayback {
         this.lastBroadcastMediaId = null;
         this.currentMediaId = null;
         this.isLoadingMedia = null;
+        if (this.pendingLeaveTimer) {
+            clearTimeout(this.pendingLeaveTimer);
+            this.pendingLeaveTimer = null;
+        }
     }
 
     onPlaybackStart(player) {
+        if (this.pendingLeaveTimer) {
+            clearTimeout(this.pendingLeaveTimer);
+            this.pendingLeaveTimer = null;
+        }
+
         this.bindCurrentVideo();
         if (this.client?.isHost && this.client?.isInRoom()) {
             const currentPlayer = player || playbackManager.getCurrentPlayer();
