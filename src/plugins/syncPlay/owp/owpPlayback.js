@@ -2,15 +2,16 @@ import { playbackManager } from '../../../components/playback/playbackmanager';
 import { ServerConnections } from 'lib/jellyfin-apiclient';
 import Events from '../../../utils/events';
 
-const DRIFT_TRIGGER_SEC = 0.15;
-const DRIFT_CLEAR_SEC = 0.06;
-const DRIFT_HARD_SEEK_SEC = 3.0;
-const PLAYBACK_RATE_MIN = 0.97;
-const PLAYBACK_RATE_MAX = 1.03;
+const DRIFT_TRIGGER_SEC = 1.0;
+const DRIFT_CLEAR_SEC = 0.4;
+const DRIFT_HARD_SEEK_SEC = 5.0;
+const PLAYBACK_RATE_MIN = 0.98;
+const PLAYBACK_RATE_MAX = 1.02;
 const RATE_HOLD_MS = 1000;
 const SYNC_LOOP_MS = 500;
 const STATE_UPDATE_INTERVAL_MS = 1000;
 const HARD_SEEK_COOLDOWN_MS = 4000;
+const NEUTRAL_DWELL_MS = 2000;
 
 class OWPPlayback {
     constructor() {
@@ -34,6 +35,7 @@ class OWPPlayback {
         this.lastHardSeekTime = 0;
         this.lastRateChangeTime = 0;
         this.isCorrectingRate = false;
+        this.belowClearSince = null;
 
         this.lastBroadcastMediaId = null;
         this.currentMediaId = null;
@@ -101,6 +103,12 @@ class OWPPlayback {
 
         this.unbindVideo();
         this.video = video;
+
+        if ('preservesPitch' in video) {
+            video.preservesPitch = false;
+        } else if ('webkitPreservesPitch' in video) {
+            video.webkitPreservesPitch = false;
+        }
 
         const onPlay = () => {
             if (this.client.isHost) {
@@ -231,6 +239,7 @@ class OWPPlayback {
                 console.debug('[OWP-Sync] Resetting rate to 1.0 (idle/paused/buffering)');
                 video.playbackRate = 1;
                 this.isCorrectingRate = false;
+                this.belowClearSince = null;
             }
             return;
         }
@@ -249,6 +258,7 @@ class OWPPlayback {
             }
             this.lastHardSeekTime = now;
             this.isCorrectingRate = false;
+            this.belowClearSince = null;
             console.info('[OWP-Sync] Hard seek required. Drift:', drift.toFixed(3), 's. Target:', expected.toFixed(2), 'Actual:', video.currentTime.toFixed(2));
             this.startSyncing(1000);
             video.currentTime = expected;
@@ -259,14 +269,27 @@ class OWPPlayback {
         }
 
         // 2. Hysteresis logic:
-        // Only trigger rate correction if drift crosses 0.15s (150ms).
-        // Once active, keep correcting until drift drops below 0.06s (60ms).
+        // Only trigger rate correction if drift crosses DRIFT_TRIGGER_SEC.
+        // Once active, keep ping-ponging directly between the two catch-up
+        // rates (skipping 1.0x) as long as drift stays outside the clear
+        // band, so a sign flip costs one rate change instead of two. Only
+        // settle back to 1.0x once drift has stayed inside the clear band
+        // for NEUTRAL_DWELL_MS, to avoid immediately re-triggering.
         if (!this.isCorrectingRate && absDrift >= DRIFT_TRIGGER_SEC) {
             this.isCorrectingRate = true;
+            this.belowClearSince = null;
             console.info('[OWP-Sync] Drift crossed threshold (', drift.toFixed(3), 's) -> activating subtle rate correction');
-        } else if (this.isCorrectingRate && absDrift < DRIFT_CLEAR_SEC) {
-            this.isCorrectingRate = false;
-            console.info('[OWP-Sync] Drift recovered (', drift.toFixed(3), 's) -> returning to 1.0x');
+        } else if (this.isCorrectingRate) {
+            if (absDrift < DRIFT_CLEAR_SEC) {
+                if (!this.belowClearSince) this.belowClearSince = now;
+                if (now - this.belowClearSince >= NEUTRAL_DWELL_MS) {
+                    this.isCorrectingRate = false;
+                    this.belowClearSince = null;
+                    console.info('[OWP-Sync] Drift settled (', drift.toFixed(3), 's) -> returning to 1.0x');
+                }
+            } else {
+                this.belowClearSince = null;
+            }
         }
 
         // 3. Normal playback (rate = 1.0)
@@ -278,7 +301,8 @@ class OWPPlayback {
             return;
         }
 
-        // 4. Subtle catch-up rate (held for at least RATE_HOLD_MS)
+        // 4. Subtle catch-up rate, ping-ponging directly between the two
+        // rates based on drift sign (held for at least RATE_HOLD_MS)
         if (now - this.lastRateChangeTime >= RATE_HOLD_MS) {
             const targetRate = drift > 0 ? PLAYBACK_RATE_MAX : PLAYBACK_RATE_MIN;
             if (video.playbackRate !== targetRate) {
