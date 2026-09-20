@@ -38,7 +38,130 @@ function getOpenedDialog() {
     return document.querySelector('.dialogContainer .dialog.opened');
 }
 
+// Shared across every video-osd controller instantiation (this module is a
+// singleton, but the default export below runs again each time the video
+// page is shown), so the native cue-lift state and the addCue patch below
+// must live at module scope rather than per-instantiation, or repeat
+// playback sessions would stack duplicate patches and lose track of state.
+const nativeCueOriginalLines = new WeakMap();
+const nativeCueTracksWithHandler = new WeakSet();
+const nativeVideosWithTrackListener = new WeakSet();
+let osdCueLiftActive = false;
+let osdCueLiftTargetPercent = 100;
+
+function setNativeCueOsdLiftActive(active, targetPercent) {
+    osdCueLiftActive = active;
+    if (active) osdCueLiftTargetPercent = targetPercent;
+}
+
+// Roughly estimate where an untouched cue's own position sits, as a percent
+// from the top of the video, so we can tell whether it already clears the
+// OSD bar without needing to lift it further. Only used for that coarse
+// yes/no check - not for exact positioning - since the line-grid mode has
+// no browser-exposed row height to convert precisely.
+function estimateOriginalPercentFromTop(original) {
+    if (original.snapToLines === false && typeof original.line === 'number') {
+        return original.line;
+    }
+    if (typeof original.line !== 'number') return 100;
+
+    const approxLineHeightPercent = 5;
+
+    // With snapToLines:true, a non-negative `line` counts rows *from the
+    // top* (already near the top - never covered by a bottom OSD bar), and
+    // a negative `line` counts rows from the bottom.
+    if (original.line >= 0) {
+        return Math.min(100, original.line * approxLineHeightPercent);
+    }
+    const percentFromBottom = -original.line * approxLineHeightPercent;
+    return Math.max(0, 100 - percentFromBottom);
+}
+
+// WebVTT's default `snapToLines: true` line-grid has no browser-exposed row
+// height or baseline, so it can't be targeted precisely - only `line` as a
+// percentage of the video height (`snapToLines: false`) is exactly defined.
+function getDesiredCueState(cue) {
+    if (!nativeCueOriginalLines.has(cue)) {
+        nativeCueOriginalLines.set(cue, { line: cue.line, snapToLines: cue.snapToLines, lineAlign: cue.lineAlign });
+    }
+    const original = nativeCueOriginalLines.get(cue);
+    if (!osdCueLiftActive) return original;
+
+    // Already positioned above where we'd lift it to - leave it alone.
+    if (estimateOriginalPercentFromTop(original) <= osdCueLiftTargetPercent) return original;
+
+    // lineAlign 'end' makes `line` the cue box's *bottom* edge instead of
+    // its top, so multi-line cues grow upward and never dip back below it.
+    return { line: osdCueLiftTargetPercent, snapToLines: false, lineAlign: 'end' };
+}
+
+function applyDesiredCueState(cue) {
+    const desired = getDesiredCueState(cue);
+    if (cue.line === desired.line && cue.snapToLines === desired.snapToLines && cue.lineAlign === desired.lineAlign) return false;
+    cue.snapToLines = desired.snapToLines;
+    cue.lineAlign = desired.lineAlign;
+    cue.line = desired.line;
+    return true;
+}
+
+function reflowCue(track, cue) {
+    // Browsers don't re-layout an already-active cue just because its
+    // `line` changed, so force a reflow by re-inserting it.
+    track.removeCue(cue);
+    track.addCue(cue);
+}
+
+let nativeAddCuePatched = false;
+
+function patchTextTrackAddCue() {
+    if (nativeAddCuePatched || typeof window.TextTrack === 'undefined') return;
+    nativeAddCuePatched = true;
+
+    // Cues can be created (and immediately shown) before we ever get a
+    // chance to react via 'addtrack'/'cuechange', so intercept addCue
+    // itself to guarantee every cue starts out at the correct line.
+    const originalAddCue = window.TextTrack.prototype.addCue;
+    window.TextTrack.prototype.addCue = function (cue) {
+        if (typeof cue.line === 'number') {
+            applyDesiredCueState(cue);
+        }
+        return originalAddCue.call(this, cue);
+    };
+}
+
+function ensureCueChangeHandler(track) {
+    if (nativeCueTracksWithHandler.has(track)) return;
+    nativeCueTracksWithHandler.add(track);
+
+    // Cues can finish loading asynchronously after the OSD's visibility
+    // has already changed, so self-correct any cue the moment it
+    // activates rather than relying solely on the one-shot pass in
+    // setCueOsdLift.
+    track.addEventListener('cuechange', () => {
+        if (!track.activeCues) return;
+        for (const cue of Array.from(track.activeCues)) {
+            if (typeof cue.line !== 'number') continue;
+            applyDesiredCueState(cue);
+        }
+    });
+}
+
+function ensureTrackListListener(video) {
+    if (!video || !video.textTracks || nativeVideosWithTrackListener.has(video)) return;
+    nativeVideosWithTrackListener.add(video);
+
+    // Subtitle tracks are often created asynchronously after the OSD's
+    // visibility (and thus the desired lift) is already known, so wire
+    // up new tracks the moment they're added rather than waiting for
+    // the next explicit OSD toggle to notice them.
+    video.textTracks.addEventListener('addtrack', (e) => {
+        if (e.track) ensureCueChangeHandler(e.track);
+    });
+}
+
 export default function (view) {
+    patchTextTrackAddCue();
+
     function getDisplayItem(item) {
         if (item.Type === 'TvChannel') {
             const apiClient = ServerConnections.getApiClient(item.ServerId);
@@ -337,6 +460,93 @@ export default function (view) {
         if (focusElement) focusManager.focus(focusElement);
     };
 
+    // How far the OSD bar's top edge sits above the bottom of the viewport,
+    // i.e. exactly how much a bottom-anchored subtitle needs to move up to
+    // clear it (plus a small gap so it doesn't sit flush against the bar).
+    function getOsdBarLiftPx() {
+        if (!osdBottomElement) return 0;
+        const rect = osdBottomElement.getBoundingClientRect();
+        const gap = 20;
+        return Math.max(0, window.innerHeight - rect.top + gap);
+    }
+
+    function liftSubtitleTextElement(elem, requiredClearancePx) {
+        if (!elem || elem.dataset.osdLifted === 'true') return;
+        const currentMarginPx = parseFloat(window.getComputedStyle(elem).marginBottom) || 0;
+        elem.dataset.osdBaseMargin = elem.style.marginBottom || '';
+        elem.dataset.osdLifted = 'true';
+        // Raise to at least the required clearance; don't push a subtitle
+        // that's already higher than that (e.g. via the user's own
+        // vertical-position preference) back down.
+        elem.style.marginBottom = `${Math.max(currentMarginPx, requiredClearancePx)}px`;
+        elem.style.transition = 'margin-bottom 0.3s ease-out';
+    }
+
+    function unliftSubtitleTextElement(elem) {
+        if (!elem || elem.dataset.osdLifted !== 'true') return;
+        elem.style.marginBottom = elem.dataset.osdBaseMargin || '';
+        delete elem.dataset.osdLifted;
+        delete elem.dataset.osdBaseMargin;
+    }
+
+    function setCueOsdLift(active, requiredClearancePx) {
+        const video = document.querySelector('video');
+
+        // With snapToLines:false, `line` is an exact percentage of the
+        // video's height from the top - unlike the default line-grid mode,
+        // this has no ambiguity about row height or baseline.
+        let targetPercent = 100;
+        if (active && video) {
+            const videoHeight = video.getBoundingClientRect().height;
+            targetPercent = Math.max(0, Math.min(100, ((videoHeight - requiredClearancePx) / videoHeight) * 100));
+        }
+        setNativeCueOsdLiftActive(active, targetPercent);
+
+        if (!video || !video.textTracks) return;
+
+        ensureTrackListListener(video);
+
+        for (const track of Array.from(video.textTracks)) {
+            ensureCueChangeHandler(track);
+            if (!track.cues) continue;
+
+            const activeCues = new Set(track.activeCues ? Array.from(track.activeCues) : []);
+
+            for (const cue of Array.from(track.cues)) {
+                if (typeof cue.line !== 'number') continue;
+
+                const isActiveCue = activeCues.has(cue);
+
+                // On the way back down, leave the currently-showing cue
+                // completely untouched - even just writing its properties
+                // causes a partial, incomplete re-layout mid-display. It'll
+                // pick up the restored (unlifted) position naturally once
+                // it ends and the next cue activates.
+                if (!active && isActiveCue) continue;
+
+                if (!applyDesiredCueState(cue)) continue;
+
+                // The `!active && isActiveCue` case already continued above,
+                // so reaching here with isActiveCue true means we're lifting.
+                if (isActiveCue) reflowCue(track, cue);
+            }
+        }
+    }
+
+    function setSubtitleOsdLift(active) {
+        const liftPx = active ? getOsdBarLiftPx() : 0;
+        const primaryElem = document.querySelector('.videoSubtitlesInner');
+        const secondaryElem = document.querySelector('.videoSecondarySubtitlesInner');
+        if (active) {
+            liftSubtitleTextElement(primaryElem, liftPx);
+            liftSubtitleTextElement(secondaryElem, liftPx);
+        } else {
+            unliftSubtitleTextElement(primaryElem);
+            unliftSubtitleTextElement(secondaryElem);
+        }
+        setCueOsdLift(active, liftPx);
+    }
+
     function showMainOsdControls(focusElement) {
         if (!currentVisibleMenu) {
             const elem = osdBottomElement;
@@ -344,6 +554,7 @@ export default function (view) {
             clearHideAnimationEventListeners(elem);
             elem.classList.remove('hide');
             elem.classList.remove('videoOsdBottom-hidden');
+            setSubtitleOsdLift(true);
 
             if (!layoutManager.mobile) {
                 _focus(focusElement);
@@ -359,6 +570,7 @@ export default function (view) {
             const elem = osdBottomElement;
             clearHideAnimationEventListeners(elem);
             elem.classList.add('videoOsdBottom-hidden');
+            setSubtitleOsdLift(false);
 
             elem.addEventListener(transitionEndEventName, onHideAnimationComplete);
             currentVisibleMenu = null;
@@ -1752,6 +1964,7 @@ export default function (view) {
             dom.removeEventListener(document, 'click', onClickCapture, { capture: true });
         }
         stopOsdHideTimer();
+        setSubtitleOsdLift(false);
         headerElement.classList.remove('osdHeader');
         headerElement.classList.remove('osdHeader-hidden');
         /* eslint-disable-next-line compat/compat */
