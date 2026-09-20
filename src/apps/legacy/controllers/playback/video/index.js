@@ -356,7 +356,7 @@ export default function (view) {
         // that's already higher than that (e.g. via the user's own
         // vertical-position preference) back down.
         elem.style.marginBottom = `${Math.max(currentMarginPx, requiredClearancePx)}px`;
-        elem.style.transition = 'margin-bottom 0.3s ease-out';
+        elem.style.transition = 'margin-bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
     }
 
     function unliftSubtitleTextElement(elem) {
@@ -366,7 +366,10 @@ export default function (view) {
         delete elem.dataset.osdBaseMargin;
     }
 
+    let osdLiftActive = false;
+
     function setSubtitleOsdLift(active) {
+        osdLiftActive = active;
         const primaryElem = document.querySelector('.videoSubtitlesInner');
         const secondaryElem = document.querySelector('.videoSecondarySubtitlesInner');
         if (active) {
@@ -378,6 +381,25 @@ export default function (view) {
             unliftSubtitleTextElement(secondaryElem);
         }
     }
+
+    // The custom subtitle element is created asynchronously once subtitle
+    // data loads, which can happen after the OSD is already showing (e.g.
+    // right at video start), so watch for it appearing and lift it
+    // immediately if the OSD is visible at that moment.
+    const subtitleElementObserver = new MutationObserver(() => {
+        if (!osdLiftActive) return;
+        const primaryElem = document.querySelector('.videoSubtitlesInner');
+        const secondaryElem = document.querySelector('.videoSecondarySubtitlesInner');
+        if (!primaryElem?.dataset.osdLifted && !secondaryElem?.dataset.osdLifted) {
+            const liftPx = getOsdBarLiftPx();
+            liftSubtitleTextElement(primaryElem, liftPx);
+            liftSubtitleTextElement(secondaryElem, liftPx);
+        }
+    });
+    // The subtitle container is appended to the video element's parent
+    // (.videoPlayerContainer), which lives outside `view`, so watch the
+    // whole document rather than just this view's subtree.
+    subtitleElementObserver.observe(document.body, { childList: true, subtree: true });
 
     function showMainOsdControls(focusElement) {
         if (!currentVisibleMenu) {
@@ -1797,6 +1819,7 @@ export default function (view) {
         }
         stopOsdHideTimer();
         setSubtitleOsdLift(false);
+        subtitleElementObserver.disconnect();
         headerElement.classList.remove('osdHeader');
         headerElement.classList.remove('osdHeader-hidden');
         /* eslint-disable-next-line compat/compat */
