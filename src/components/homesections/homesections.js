@@ -29,16 +29,9 @@ export function getDefaultSection(index) {
     return DEFAULT_SECTIONS[index];
 }
 
-function getAllSectionsToShow(userSettings) {
-    const sections = [];
-    for (let i = 0, length = MAX_SECTIONS; i < length; i++) {
-        let section = userSettings.get('homesection' + i) || getDefaultSection(i);
-        if (section === 'folders') {
-            section = getDefaultSection(0);
-        }
-
-        sections.push(section);
-    }
+function getAllSectionsToShow() {
+    // The home screen order is fixed; per-user section settings are ignored.
+    const sections = DEFAULT_SECTIONS.slice(0, MAX_SECTIONS);
 
     // Ensure libraries are visible in TV layout
     if (
@@ -74,7 +67,7 @@ export function loadSections(elem, apiClient, user, userSettings) {
                 elem.innerHTML = html;
                 elem.classList.add('homeSectionsContainer');
 
-                const promises = getAllSectionsToShow(userSettings)
+                const promises = getAllSectionsToShow()
                     .map((section, index) => (
                         loadSection(elem, apiClient, user, userSettings, userViews, section, index)
                     ));

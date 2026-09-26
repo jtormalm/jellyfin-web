@@ -13,16 +13,15 @@ export enum HomeSectionType {
     ResumeBook = 'resumebook'
 }
 
-// NOTE: This needs to match the server defaults
-// https://github.com/jellyfin/jellyfin/blob/1b4394199a2f9883cd601bdb8c9d66015397aa52/Jellyfin.Api/Controllers/DisplayPreferencesController.cs#L120
+// Fixed home screen order; overrides the server defaults and any user setting.
 export const DEFAULT_SECTIONS: HomeSectionType[] = [
-    HomeSectionType.SmallLibraryTiles,
     HomeSectionType.Resume,
     HomeSectionType.ResumeAudio,
     HomeSectionType.ResumeBook,
-    HomeSectionType.LiveTv,
     HomeSectionType.NextUp,
+    HomeSectionType.SmallLibraryTiles,
     HomeSectionType.LatestMedia,
+    HomeSectionType.LiveTv,
     HomeSectionType.None,
     HomeSectionType.None,
     HomeSectionType.None
