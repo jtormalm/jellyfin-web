@@ -2718,7 +2718,7 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     inset: 0;
     z-index: 1;
     opacity: 0;
-    transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     -webkit-mask-image:
         linear-gradient(to bottom, black 40%, transparent 100%),
         linear-gradient(to right, transparent 0%, black 25%, black 70%, transparent 100%),
@@ -2777,7 +2777,7 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     margin-bottom: 36px;
     filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.7));
     animation: spotlightLogoSlide 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: 0.3s;
+    animation-delay: 0.1s;
     pointer-events: auto;
 }
 
@@ -2801,7 +2801,7 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     text-shadow: 0 2px 16px rgba(0, 0, 0, 0.8);
     display: none;
     animation: spotlightLogoSlide 1s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: 0.3s;
+    animation-delay: 0.1s;
     pointer-events: auto;
 }
 
@@ -2812,7 +2812,7 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     margin-bottom: 12px;
     letter-spacing: 0.02em;
     animation: spotlightFadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: 0.4s;
+    animation-delay: 0.12s;
     pointer-events: auto;
 }
 
@@ -2821,7 +2821,7 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     align-items: center;
     margin-bottom: 12px;
     animation: spotlightFadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: 0.5s;
+    animation-delay: 0.15s;
     flex-wrap: wrap;
     gap: 6px;
     pointer-events: auto;
@@ -2868,7 +2868,7 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     margin-top: 8px;
     overflow: hidden;
     animation: spotlightFadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: 0.1s;
+    animation-delay: 0.05s;
     pointer-events: auto;
 }
 
@@ -2891,7 +2891,7 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     -webkit-box-orient: vertical;
     overflow: hidden;
     animation: spotlightFadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: 0.65s;
+    animation-delay: 0.2s;
     pointer-events: auto;
 }
 
@@ -2901,7 +2901,7 @@ div[data-role="controlgroup"] a[data-role="button"]:last-child {
     position: relative;
     z-index: 4;
     animation: spotlightFadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: 0.75s;
+    animation-delay: 0.25s;
     pointer-events: auto;
 }
 

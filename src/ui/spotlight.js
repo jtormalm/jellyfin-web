@@ -4,6 +4,9 @@ import { ServerConnections } from 'lib/jellyfin-apiclient';
 
 const AUTO_INTERVAL = 5000;
 const REFRESH_INTERVAL = 60000;
+const LOGO_TIMEOUT = 400;
+const FADE_OUT_MS = 260;
+const CACHE_PREFIX = 'spotlight-items-';
 const FIELDS = 'Overview,RunTimeTicks,UserData,OfficialRating,CommunityRating,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,PlaybackPositionTicks';
 
 const SVG_PLAY = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M320-273v-414q0-17 12-28.5t28-11.5q5 0 10.5 1.5T381-721l326 207q9 6 13.5 15t4.5 19q0 10-4.5 19T707-446L381-239q-5 3-10.5 4.5T360-233q-16 0-28-11.5T320-273Z"/></svg>`;
@@ -27,6 +30,8 @@ export class NativeSpotlight {
         this.zoomAnimation = null;
         this.renderSequence = 0;
         this.lastRefresh = 0;
+        this.renderedId = null;
+        this.hasRendered = false;
         this.paused = true;
         this.disposed = false;
         this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -47,7 +52,7 @@ export class NativeSpotlight {
         const container = document.createElement('div');
         container.className = 'spotlight-container';
         container.innerHTML = `
-            <div class="spotlight-backdrop"><img class="spotlight-backdrop-img" alt="" /></div>
+            <div class="spotlight-backdrop"><img class="spotlight-backdrop-img" alt="" decoding="async" fetchpriority="high" /></div>
             <div class="spotlight-content">
                 <img class="spotlight-logo" alt="" />
                 <div class="spotlight-title"></div>
@@ -149,28 +154,27 @@ export class NativeSpotlight {
         return apiClient.getScaledImageUrl(itemId, options);
     }
 
+    preloadImage(url) {
+        if (!url) return Promise.resolve(null);
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(url);
+            img.onerror = () => resolve(null);
+            img.src = url;
+        });
+    }
+
+    async loadBackdrop(urls) {
+        const backdrop = await this.preloadImage(urls.backdrop);
+        if (backdrop || !urls.primary) return { url: backdrop, primary: false };
+        return { url: await this.preloadImage(urls.primary), primary: true };
+    }
+
     async fetchArtwork(item, signal) {
         const urls = this.itemImageUrls(item);
-        const preloadImage = (url) => {
-            if (!url) return Promise.resolve(null);
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => resolve(url);
-                img.onerror = () => resolve(null);
-                img.src = url;
-            });
-        };
-
-        const logoPromise = preloadImage(urls.logo);
-        let backdrop = await preloadImage(urls.backdrop);
-        let primaryBackdrop = false;
-        if (!backdrop && urls.primary) {
-            backdrop = await preloadImage(urls.primary);
-            primaryBackdrop = true;
-        }
-
+        const [backdrop, logo] = await Promise.all([this.loadBackdrop(urls), this.preloadImage(urls.logo)]);
         if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-        return { backdrop, logo: await logoPromise, primaryBackdrop };
+        return { backdrop, logo };
     }
 
     wait(ms, signal) {
@@ -233,45 +237,29 @@ export class NativeSpotlight {
         const picked = new Map(combined.map(item => [item.Id, item]));
 
         if (picked.size < MIN_ITEMS) {
-            try {
-                const recentMovies = await apiClient.getJSON(apiClient.getUrl(`Users/${userId}/Items`, {
-                    Limit: MAX_ITEMS,
-                    Recursive: true,
-                    SortBy: 'DateCreated',
-                    SortOrder: 'Descending',
-                    IncludeItemTypes: 'Movie',
-                    Fields: FIELDS,
-                    EnableTotalRecordCount: false
-                }));
-                for (const item of recentMovies?.Items || []) {
-                    if (picked.size >= MAX_ITEMS) break;
-                    if (!picked.has(item.Id)) picked.set(item.Id, { ...item, _source: 'recent-movie' });
-                }
-            } catch (error) {
-                if (error.name === 'AbortError') throw error;
-                console.warn('[Spotlight] Failed to load recent movies:', error);
-            }
-        }
+            const recentQuery = (type) => apiClient.getJSON(apiClient.getUrl(`Users/${userId}/Items`, {
+                Limit: MAX_ITEMS,
+                Recursive: true,
+                SortBy: 'DateCreated',
+                SortOrder: 'Descending',
+                IncludeItemTypes: type,
+                Fields: FIELDS,
+                EnableTotalRecordCount: false
+            }));
+            const recent = await Promise.allSettled([recentQuery('Movie'), recentQuery('Series')]);
+            if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
 
-        if (picked.size < MIN_ITEMS) {
-            try {
-                const recentShows = await apiClient.getJSON(apiClient.getUrl(`Users/${userId}/Items`, {
-                    Limit: MAX_ITEMS,
-                    Recursive: true,
-                    SortBy: 'DateCreated',
-                    SortOrder: 'Descending',
-                    IncludeItemTypes: 'Series',
-                    Fields: FIELDS,
-                    EnableTotalRecordCount: false
-                }));
-                for (const item of recentShows?.Items || []) {
-                    if (picked.size >= MAX_ITEMS) break;
-                    if (!picked.has(item.Id)) picked.set(item.Id, { ...item, _source: 'recent-show' });
+            const sources = ['recent-movie', 'recent-show'];
+            recent.forEach((result, index) => {
+                if (result.status !== 'fulfilled') {
+                    console.warn(`[Spotlight] Failed to load ${sources[index]} items:`, result.reason);
+                    return;
                 }
-            } catch (error) {
-                if (error.name === 'AbortError') throw error;
-                console.warn('[Spotlight] Failed to load recent shows:', error);
-            }
+                for (const item of result.value?.Items || []) {
+                    if (picked.size >= MAX_ITEMS) break;
+                    if (!picked.has(item.Id)) picked.set(item.Id, { ...item, _source: sources[index] });
+                }
+            });
         }
 
         return [...picked.values()].slice(0, MAX_ITEMS);
@@ -368,13 +356,10 @@ export class NativeSpotlight {
         });
     }
 
-    updateContent(item, artwork) {
-        const isEpisode = item.Type === 'Episode';
-        const title = isEpisode ? item.SeriesName || item.Name : item.Name;
-
-        if (artwork.backdrop) {
-            this.backdropImg.src = artwork.backdrop;
-            this.backdropImg.style.objectPosition = artwork.primaryBackdrop ? 'center center' : 'center 20%';
+    updateBackdrop(backdrop) {
+        if (backdrop.url) {
+            this.backdropImg.src = backdrop.url;
+            this.backdropImg.style.objectPosition = backdrop.primary ? 'center center' : 'center 20%';
             this.backdrop.classList.add('loaded');
             this.startZoom(this.backdropImg);
         } else {
@@ -384,10 +369,15 @@ export class NativeSpotlight {
             this.backdropImg.style.transform = '';
             this.backdrop.classList.add('loaded');
         }
+    }
+
+    updateContent(item, logo) {
+        const isEpisode = item.Type === 'Episode';
+        const title = isEpisode ? item.SeriesName || item.Name : item.Name;
 
         let episodePrefix = '';
-        if (artwork.logo) {
-            this.logo.src = artwork.logo;
+        if (logo) {
+            this.logo.src = logo;
             this.logo.style.display = 'block';
             this.title.style.display = 'none';
         } else {
@@ -463,17 +453,41 @@ export class NativeSpotlight {
         this.renderController = new AbortController();
         const { signal } = this.renderController;
         const sequence = ++this.renderSequence;
+        const isCurrent = () => !signal.aborted && sequence === this.renderSequence;
+        this.renderedId = item.Id;
         this.updateDots();
 
         try {
-            const artwork = await this.fetchArtwork(item, signal);
-            if (signal.aborted || sequence !== this.renderSequence) return false;
+            const urls = this.itemImageUrls(item);
+            const logoPromise = this.preloadImage(urls.logo);
+            const backdropPromise = this.loadBackdrop(urls);
+
+            // First paint: show the text as soon as possible and let the backdrop fade in when it
+            // arrives. Later slides wait for all artwork so text never sits on the old backdrop.
+            const progressive = !this.hasRendered;
+            let logo;
+            let backdrop;
+            if (progressive) {
+                logo = await Promise.race([logoPromise, this.wait(LOGO_TIMEOUT, signal).then(() => null)]);
+            } else {
+                [logo, backdrop] = await Promise.all([logoPromise, backdropPromise]);
+            }
+            if (!isCurrent()) return false;
+
             this.content.classList.remove('visible');
             this.backdrop.classList.remove('loaded');
-            await this.wait(this.reducedMotion.matches ? 0 : 260, signal);
-            if (signal.aborted || sequence !== this.renderSequence) return false;
-            this.updateContent(item, artwork);
+            // Let the previous slide fade out before swapping content (nothing to fade on first paint).
+            if (!progressive) {
+                await this.wait(this.reducedMotion.matches ? 0 : FADE_OUT_MS, signal);
+                if (!isCurrent()) return false;
+            }
+            this.updateContent(item, logo);
             this.content.classList.add('visible');
+            this.hasRendered = true;
+
+            if (progressive) backdrop = await backdropPromise;
+            if (!isCurrent()) return false;
+            this.updateBackdrop(backdrop);
             this.queuePreload();
             return true;
         } catch (error) {
@@ -482,20 +496,61 @@ export class NativeSpotlight {
         }
     }
 
+    cacheKey() {
+        const apiClient = this.getApiClient();
+        const userId = this.getUserId();
+        return apiClient && userId ? `${CACHE_PREFIX}${apiClient.serverId()}-${userId}` : null;
+    }
+
+    restoreCachedItems() {
+        const key = this.cacheKey();
+        if (!key) return false;
+        try {
+            const cached = JSON.parse(localStorage.getItem(key) || 'null');
+            if (!Array.isArray(cached) || !cached.length) return false;
+            this.items = cached;
+            this.currentIndex = 0;
+            this.buildDots();
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    saveCachedItems() {
+        const key = this.cacheKey();
+        if (!key) return;
+        try {
+            localStorage.setItem(key, JSON.stringify(this.items));
+        } catch {
+            // Storage unavailable or full; the cache is only a startup optimisation.
+        }
+    }
+
     async refreshItems() {
         if (this.refreshPromise) return this.refreshPromise;
         this.refreshController?.abort();
         this.refreshController = new AbortController();
         this.refreshPromise = (async () => {
-            const currentId = this.items[this.currentIndex]?.Id;
             const nextItems = await this.fetchItems(this.refreshController.signal);
             if (this.paused || this.disposed) return;
-            this.items = nextItems;
+
+            // Never swap out the slide the user is looking at (e.g. one restored from cache):
+            // keep it first and fill the rest of the carousel with the fresh items.
+            const shown = this.items.find(item => item.Id === this.renderedId);
+            if (shown) {
+                const fresh = nextItems.find(item => item.Id === shown.Id) || shown;
+                const rest = nextItems.filter(item => item.Id !== shown.Id);
+                this.items = [fresh, ...rest].slice(0, Math.max(nextItems.length, 1));
+            } else {
+                this.items = nextItems;
+            }
+            this.currentIndex = 0;
             this.lastRefresh = Date.now();
-            this.currentIndex = Math.max(0, this.items.findIndex(item => item.Id === currentId));
             if (this.emptyElem) this.emptyElem.style.display = this.items.length ? 'none' : 'flex';
+            this.saveCachedItems();
             this.buildDots();
-            if (this.items.length) await this.renderItem(this.currentIndex);
+            if (this.items.length && !shown) await this.renderItem(this.currentIndex);
         })();
 
         try {
@@ -526,11 +581,14 @@ export class NativeSpotlight {
         if (this.container) this.container.style.display = 'block';
         const wasPaused = this.paused;
         this.paused = false;
-        if (!this.items.length || Date.now() - this.lastRefresh > REFRESH_INTERVAL) {
-            await this.refreshItems();
-        } else if (wasPaused && this.items.length) {
-            await this.renderItem(this.currentIndex);
+        if (!this.items.length) this.restoreCachedItems();
+        const stale = !this.items.length || Date.now() - this.lastRefresh > REFRESH_INTERVAL;
+        if (wasPaused && this.items.length) {
+            this.renderedId = null;
+            const rendering = this.renderItem(this.currentIndex);
+            if (!stale) await rendering;
         }
+        if (stale) await this.refreshItems();
         this.startAuto();
     }
 
