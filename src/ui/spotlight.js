@@ -6,6 +6,7 @@ const AUTO_INTERVAL = 5000;
 const REFRESH_INTERVAL = 60000;
 const LOGO_TIMEOUT = 400;
 const FADE_OUT_MS = 260;
+const IMAGE_QUALITY = 80;
 const CACHE_PREFIX = 'spotlight-items-';
 const FIELDS = 'Overview,RunTimeTicks,UserData,OfficialRating,CommunityRating,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,PlaybackPositionTicks';
 
@@ -126,32 +127,13 @@ export class NativeSpotlight {
         return pill;
     }
 
-    imageDimensions(type) {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        if (type === 'Logo') {
-            return {
-                width: Math.max(960, Math.ceil(window.innerWidth * 0.55 * dpr)),
-                height: Math.max(360, Math.ceil(120 * dpr))
-            };
-        }
-        return {
-            width: Math.min(2560, Math.max(1920, Math.ceil(window.innerWidth * dpr))),
-            height: Math.min(1440, Math.max(1080, Math.ceil(window.innerHeight * dpr)))
-        };
-    }
-
     imageUrl(itemId, type, index = null) {
         const apiClient = this.getApiClient();
         if (!apiClient) return '';
-        const { width, height } = this.imageDimensions(type);
-        const options = {
-            type,
-            quality: 88,
-            maxWidth: width,
-            maxHeight: height
-        };
-        if (index != null) options.index = index;
-        return apiClient.getScaledImageUrl(itemId, options);
+        // Full resolution (no size limit) at a fixed quality. Built by hand because
+        // getScaledImageUrl scales sizes by devicePixelRatio and applies its own default quality.
+        const path = `Items/${itemId}/Images/${type}` + (index != null ? `/${index}` : '');
+        return apiClient.getUrl(path, { quality: IMAGE_QUALITY });
     }
 
     preloadImage(url) {
